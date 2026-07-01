@@ -1,0 +1,1104 @@
+{
+    "patterns": {
+        "AK": {
+            "description": "AK pattern.",
+            "steps": [
+                {
+                    "dx": -4,
+                    "dy": 7,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 4,
+                    "dy": 19,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -3,
+                    "dy": 29,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -1,
+                    "dy": 31,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 13,
+                    "dy": 31,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 8,
+                    "dy": 28,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 13,
+                    "dy": 21,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -17,
+                    "dy": 12,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -42,
+                    "dy": -3,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -21,
+                    "dy": 2,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 12,
+                    "dy": 11,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -15,
+                    "dy": 7,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -26,
+                    "dy": -8,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -3,
+                    "dy": 4,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 40,
+                    "dy": 1,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 19,
+                    "dy": 7,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 14,
+                    "dy": 10,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 27,
+                    "dy": 0,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 33,
+                    "dy": -10,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -21,
+                    "dy": -2,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 7,
+                    "dy": 3,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -7,
+                    "dy": 9,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -8,
+                    "dy": 4,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 19,
+                    "dy": -3,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 5,
+                    "dy": 6,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -20,
+                    "dy": -1,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -33,
+                    "dy": -4,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -45,
+                    "dy": -21,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -14,
+                    "dy": 1,
+                    "duration_ms": 99
+                }
+            ]
+        },
+        "M4A1": {
+            "description": "M4A1 pattern.",
+            "steps": [
+                {
+                    "dx": 1,
+                    "dy": 6,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 0,
+                    "dy": 4,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -4,
+                    "dy": 14, 
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 4,
+                    "dy": 14,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -6,
+                    "dy": 16,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -4,
+                    "dy": 20,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 14,
+                    "dy": 14,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 8,
+                    "dy": 12,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 18,
+                    "dy": 5,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -4,
+                    "dy": 10,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -14,
+                    "dy": 5,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -25,
+                    "dy": -3,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -19,
+                    "dy": 0,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -22,
+                    "dy": -3,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 1,
+                    "dy": 3,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 8,
+                    "dy": 3,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -9,
+                    "dy": 1,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": -13,
+                    "dy": -2,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 3,
+                    "dy": 2,
+                    "duration_ms": 99
+                },
+                {
+                    "dx": 1,
+                    "dy": 1,
+                    "duration_ms": 99
+                }
+            ]
+        },
+        "M4A4": {
+            "description": "M4A4 pattern.",
+            "steps": [
+                {
+                    "dx": 2,
+                    "dy": 7,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 0,
+                    "dy": 9,
+                    "duration_ms": 87
+                },
+                {
+                    "dx": -6,
+                    "dy": 16,
+                    "duration_ms": 87
+                },
+                {
+                    "dx": 7,
+                    "dy": 21,
+                    "duration_ms": 87
+                },
+                {
+                    "dx": -9,
+                    "dy": 23,
+                    "duration_ms": 87
+                },
+                {
+                    "dx": -5,
+                    "dy": 27,
+                    "duration_ms": 87
+                },
+                {
+                    "dx": 16,
+                    "dy": 15,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 11,
+                    "dy": 13,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 22,
+                    "dy": 5,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -4,
+                    "dy": 11,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -18,
+                    "dy": 6,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -30,
+                    "dy": -4,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -24,
+                    "dy": 0,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -25,
+                    "dy": -6,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 0,
+                    "dy": 4,
+                    "duration_ms": 87
+                },
+                {
+                    "dx": 8,
+                    "dy": 4,
+                    "duration_ms": 87
+                },
+                {
+                    "dx": -11,
+                    "dy": 1,
+                    "duration_ms": 87
+                },
+                {
+                    "dx": -13,
+                    "dy": -2,
+                    "duration_ms": 87
+                },
+                {
+                    "dx": 2,
+                    "dy": 2,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 33,
+                    "dy": -1,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 10,
+                    "dy": 6,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 27,
+                    "dy": 3,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 10,
+                    "dy": 2,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 11,
+                    "dy": 0,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -12,
+                    "dy": 0,
+                    "duration_ms": 87
+                },
+                {
+                    "dx": 6,
+                    "dy": 5,
+                    "duration_ms": 87
+                },
+                {
+                    "dx": 4,
+                    "dy": 5,
+                    "duration_ms": 87
+                },
+                {
+                    "dx": 3,
+                    "dy": 1,
+                    "duration_ms": 87
+                },
+                {
+                    "dx": 4,
+                    "dy": -1,
+                    "duration_ms": 87
+                }
+            ]
+        },
+        "Famas": {
+            "description": "Famas pattern.",
+            "steps": [
+                {
+                    "dx": -4,
+                    "dy": 5,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 1,
+                    "dy": 4,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -6,
+                    "dy": 10,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -1,
+                    "dy": 17,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 0,
+                    "dy": 20,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 14,
+                    "dy": 18,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 16,
+                    "dy": 12,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -6,
+                    "dy": 12,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -20,
+                    "dy": 8,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -16,
+                    "dy": 5,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -13,
+                    "dy": 2,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 4,
+                    "dy": 5,
+                    "duration_ms": 87
+                },
+                {
+                    "dx": 23,
+                    "dy": 4,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 12,
+                    "dy": 6,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 20,
+                    "dy": -3,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 5,
+                    "dy": 0,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 15,
+                    "dy": 0,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 3,
+                    "dy": 5,
+                    "duration_ms": 80
+                },
+                {
+                    "dx": -4,
+                    "dy": 3,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -25,
+                    "dy": -1,
+                    "duration_ms": 80
+                },
+                {
+                    "dx": -3,
+                    "dy": 2,
+                    "duration_ms": 84
+                },
+                {
+                    "dx": 11,
+                    "dy": 0,
+                    "duration_ms": 80
+                },
+                {
+                    "dx": 15,
+                    "dy": -7,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 15,
+                    "dy": -10,
+                    "duration_ms": 88
+                }
+            ]
+        },
+        "Galil": {
+            "description": "Galil pattern.",
+            "steps": [
+                {
+                    "dx": 4,
+                    "dy": 4,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -2,
+                    "dy": 5,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 6,
+                    "dy": 10,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 12,
+                    "dy": 15,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -1,
+                    "dy": 21,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 2,
+                    "dy": 24,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 6,
+                    "dy": 16,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 11,
+                    "dy": 10,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -4,
+                    "dy": 14,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -22,
+                    "dy": 8,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -30,
+                    "dy": -3,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -29,
+                    "dy": -13,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -9,
+                    "dy": 8,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -12,
+                    "dy": 2,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -7,
+                    "dy": 1,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 0,
+                    "dy": 1,
+                    "duration_ms": 50
+                },
+                {
+                    "dx": 4,
+                    "dy": 7,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 25,
+                    "dy": 7,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 14,
+                    "dy": 4,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 25,
+                    "dy": -3,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 31,
+                    "dy": -9,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 6,
+                    "dy": 3,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -12,
+                    "dy": 3,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 13,
+                    "dy": -1,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 10,
+                    "dy": -1,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 16,
+                    "dy": -4,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -9,
+                    "dy": 5,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -32,
+                    "dy": -5,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -24,
+                    "dy": -3,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -15,
+                    "dy": 5,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 6,
+                    "dy": 8,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -14,
+                    "dy": -3,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -24,
+                    "dy": -14,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -13,
+                    "dy": -1,
+                    "duration_ms": 90
+                }
+            ]
+        },
+        "UMP": {
+            "description": "UMP pattern.",
+            "steps": [
+                {
+                    "dx": -1,
+                    "dy": 6,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -4,
+                    "dy": 8,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -2,
+                    "dy": 18,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -4,
+                    "dy": 23,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -9,
+                    "dy": 23,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -3,
+                    "dy": 26,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 11,
+                    "dy": 17,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -4,
+                    "dy": 12,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 9,
+                    "dy": 13,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 18,
+                    "dy": 8,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 15,
+                    "dy": 5,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -1,
+                    "dy": 3,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 5,
+                    "dy": 6,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 0,
+                    "dy": 6,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 9,
+                    "dy": -3,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 5,
+                    "dy": -1,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -12,
+                    "dy": 4,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -19,
+                    "dy": 1,
+                    "duration_ms": 85
+                },
+                {
+                    "dx": -1,
+                    "dy": -2,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 15,
+                    "dy": -5,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": 17,
+                    "dy": -2,
+                    "duration_ms": 85
+                },
+                {
+                    "dx": -6,
+                    "dy": 3,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -20,
+                    "dy": -2,
+                    "duration_ms": 90
+                },
+                {
+                    "dx": -3,
+                    "dy": -1,
+                    "duration_ms": 90
+                }
+            ]
+        },
+        "AUG": {
+            "description": "AUG pattern.",
+            "steps": [
+                {
+                    "dx": 4,
+                    "dy": 4,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": 0,
+                    "dy": 8,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -3,
+                    "dy": 15,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -5,
+                    "dy": 18,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 4,
+                    "dy": 20,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 6,
+                    "dy": 21,
+                    "duration_ms": 80
+                },
+                {
+                    "dx": 10,
+                    "dy": 15,
+                    "duration_ms": 80
+                },
+                {
+                    "dx": 4,
+                    "dy": 10,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": 10,
+                    "dy": 9,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -11,
+                    "dy": 8,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -4,
+                    "dy": 4,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": 9,
+                    "dy": 0,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 1,
+                    "dy": 4,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -15,
+                    "dy": 4,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -26,
+                    "dy": -8,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -22,
+                    "dy": -9,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -2,
+                    "dy": 4,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -3,
+                    "dy": 3,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -6,
+                    "dy": 0,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 17,
+                    "dy": 1,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": 22,
+                    "dy": 2,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 11,
+                    "dy": 4,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -3,
+                    "dy": 1,
+                    "duration_ms": 88
+                }
+            ]
+        },
+        "SG": {
+            "description": "SG pattern.",
+            "steps": [
+                {
+                    "dx": -3,
+                    "dy": 6,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -9,
+                    "dy": 10,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -6,
+                    "dy": 17,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -4,
+                    "dy": 20,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -6,
+                    "dy": 21,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -5,
+                    "dy": 25,
+                    "duration_ms": 80
+                },
+                {
+                    "dx": -14,
+                    "dy": 10,
+                    "duration_ms": 80
+                },
+                {
+                    "dx": 10,
+                    "dy": 12,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -6,
+                    "dy": 8,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -10,
+                    "dy": 5,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -3,
+                    "dy": 3,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": 4,
+                    "dy": 3,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -6,
+                    "dy": 4,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": 1,
+                    "dy": 8,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -10,
+                    "dy": -4,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -14,
+                    "dy": -12,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -12,
+                    "dy": -6,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": -6,
+                    "dy": -1,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": 28,
+                    "dy": 2,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 39,
+                    "dy": -3,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": 30,
+                    "dy": -1,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 12,
+                    "dy": 6,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": 10,
+                    "dy": 6,
+                    "duration_ms": 88
+                },
+                {
+                    "dx": 4,
+                    "dy": 5,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": 15,
+                    "dy": -2,
+                    "duration_ms": 95
+                },
+                {
+                    "dx": 20,
+                    "dy": -3,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -4,
+                    "dy": 6,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -10,
+                    "dy": 3,
+                    "duration_ms": 89
+                },
+                {
+                    "dx": -26,
+                    "dy": -3,
+                    "duration_ms": 89
+                }
+            ]
+        }
+    }
+}
