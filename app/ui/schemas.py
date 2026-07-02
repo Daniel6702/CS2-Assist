@@ -74,7 +74,7 @@ def component_schemas() -> list[tuple[str, str, list[dict[str, Any]]]]:
         ),
         (
             "cv_trigger",
-            "CV Trigger / Aim Assist",
+            "CV Aim Assist",
             [],
         ),
     ]

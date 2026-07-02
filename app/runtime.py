@@ -36,6 +36,7 @@ class RuntimeManager:
         components_cfg = profile.get("components", {}) or {}
         cfg = deepcopy(dict(components_cfg.get(name, {})))
         shared = dict((profile.get("app", {}) or {}).get("shared", {}) or {})
+        app_safety = dict((profile.get("app", {}) or {}).get("safety", {}))
 
         keyboard_device_path = str(shared.get("keyboard_device_path", "") or "")
         game_sensitivity = float(shared.get("game_sensitivity", 1.0) or 1.0)
@@ -70,6 +71,11 @@ class RuntimeManager:
             provider = getattr(recoil_component, "get_alignment_state", None)
             if callable(provider):
                 cfg["recoil_runtime_provider"] = provider
+
+        if name in {"recoil", "pixel_trigger", "cv_trigger"}:
+            cfg["_safety"] = deepcopy(dict(app_safety.get(name, {})))
+            cfg["_safety"]["enabled"] = bool(app_safety.get("enabled", False))
+            cfg["_safety"]["obscure_device_names"] = bool(app_safety.get("obscure_device_names", False))
 
         return cfg
 

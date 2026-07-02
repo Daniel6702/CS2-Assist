@@ -17,6 +17,7 @@ from pynput import mouse
 
 from app.components.base import BaseComponent
 from app.gsi import GameState
+from app.utils.input_safety import ORIGINAL_RECOIL_MOUSE_NAME, device_name, humanize_frequency_interval, humanize_jitter
 
 try:
     import uinput  # type: ignore
@@ -186,10 +187,11 @@ def parse_pattern(pattern_file: dict[str, Any], name: str, st: RuntimeSettings, 
 
 
 class MouseBackend:
-    def __init__(self) -> None:
+    def __init__(self, obscure: bool = False) -> None:
         self._win = os.name == "nt"
         self._uinput_dev = None
         self._pynput_mouse = None
+        self._obscure = obscure
 
         if self._win:
             class MOUSEINPUT(ctypes.Structure):
@@ -211,16 +213,24 @@ class MouseBackend:
             self._MOUSEEVENTF_MOVE = 0x0001
             return
 
+        self._ensure_uinput()
+
+    def set_obscure(self, obscure: bool) -> None:
+        """Toggle obscure device name. Takes effect on next uinput device creation."""
+        self._obscure = obscure
+
+    def _ensure_uinput(self) -> None:
+        if self._uinput_dev is not None:
+            return
         if uinput is not None:
             try:
                 self._uinput_dev = uinput.Device(
                     [uinput.BTN_LEFT, uinput.REL_X, uinput.REL_Y],
-                    name="cs2-unified-recoil-virtual-mouse",
+                    name=device_name(ORIGINAL_RECOIL_MOUSE_NAME, obscure=self._obscure),
                 )
-                time.sleep(0.05)
+                time.sleep(humanize_jitter(0.05, fraction=0.3, min_val=0.02))
             except Exception:
                 self._uinput_dev = None
-
         if self._uinput_dev is None:
             self._pynput_mouse = mouse.Controller()
 
@@ -312,7 +322,8 @@ def pos_at_time(pts: list[TimedPoint], vels: list[tuple[float, float]], t: float
 class SmoothMousePlayer:
     def __init__(self, owner: "RecoilComponent") -> None:
         self.owner = owner
-        self.mouse = MouseBackend()
+        obscure = bool(owner._safety_config.get("obscure_device_names", False))
+        self.mouse = MouseBackend(obscure=obscure)
         self._thr: threading.Thread | None = None
         self._stop = threading.Event()
         self._lock = threading.RLock()
@@ -430,14 +441,20 @@ class SmoothMousePlayer:
         total = pts[-1].t
         step = 1.0 / max(1, st.frequency_hz)
 
+        _sf = self.owner._safety_config
+        _enabled = bool(_sf.get("enabled", False))
+        _step_frac = float(_sf.get("jitter_step_fraction", 0.0))
+        _noise_mix_frac = float(_sf.get("jitter_noise_mix_fraction", 0.0))
+        _noise_decay_frac = float(_sf.get("jitter_noise_decay_fraction", 0.0))
+
         self.owner.reset_alignment_offset()
         self.owner.set_alignment_active(True)
         idx = 0
         next_tick = time.perf_counter()
         lastx = lasty = resx = resy = 0.0
         noise_x = noise_y = 0.0
-        noise_mix = 0.22
-        noise_decay = 0.78
+        noise_mix = humanize_jitter(0.22, fraction=_noise_mix_frac if _enabled else 0.0, min_val=0.10, max_val=0.40)
+        noise_decay = humanize_jitter(0.78, fraction=_noise_decay_frac if _enabled else 0.0, min_val=0.60, max_val=0.90)
 
         while not self._stop.is_set():
             if not self.owner.automation_permitted():
@@ -464,10 +481,11 @@ class SmoothMousePlayer:
                 break
 
             idx += 1
-            next_tick += step
+            tick_step = humanize_jitter(step, fraction=_step_frac if _enabled else 0.0, min_val=0.0005)
+            next_tick += tick_step
             now = time.perf_counter()
             if next_tick < now:
-                next_tick = now + step
+                next_tick = now + tick_step
             self._sleep_until(next_tick, self._stop)
 
     def _run_return(self, spray_offset_x: float, spray_offset_y: float, st: RuntimeSettings) -> None:
@@ -554,6 +572,7 @@ class RecoilComponent(BaseComponent):
         super().__init__()
         self.runtime_settings = parse_settings({})
         self.pattern_file: dict[str, Any] = {"patterns": {}}
+        self._safety_config: dict[str, Any] = {}
         self.player = SmoothMousePlayer(self)
         self.listener: MouseHoldListener | None = None
         self._current_weapon: str | None = None
@@ -605,6 +624,9 @@ class RecoilComponent(BaseComponent):
         super().configure(config)
         self.runtime_settings = parse_settings(config)
         self.pattern_file = load_pattern_file(PATTERNS_FILE)
+        self._safety_config = dict(config.get("_safety", {}))
+        obscure = bool(self._safety_config.get("obscure_device_names", False))
+        self.player.mouse.set_obscure(obscure)
         self._report_pattern_status(force=True)
 
     def start(self) -> None:

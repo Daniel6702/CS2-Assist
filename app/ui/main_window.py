@@ -8,6 +8,7 @@ from app.common import deep_copy, deep_get, deep_set
 from app.device_service import DeviceService
 from app.profile_store import ProfileStore
 from app.runtime import RuntimeManager
+from app.ui.hotkeys import HotkeyBridge
 from app.ui import styles
 from app.ui.schemas import component_schemas
 from app.ui.tabs import (
@@ -22,6 +23,7 @@ from app.ui.widgets import BulletImpactOverlay, LogBridge
 
 
 _COMPONENT_SCHEMA_NAMES: Final[frozenset[str]] = frozenset(name for name, _title, _schema in component_schemas())
+_MOVEMENT_COMPONENTS: Final[tuple[str, ...]] = ("bhop", "snap_tap", "counter_strafe")
 
 
 def _deep_merge_preserving_hidden(base: dict[str, Any], update: dict[str, Any]) -> dict[str, Any]:
@@ -49,12 +51,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.log_bridge = LogBridge()
         self.log_bridge.message.connect(self._append_log)
         self.runtime = RuntimeManager(status_callback=self._runtime_status)
+        self.hotkeys = HotkeyBridge(self)
+        self.hotkeys.activated.connect(self._on_hotkey_activated)
         self.bullet_overlay = BulletImpactOverlay()
         self.overlay_timer = QtCore.QTimer(self)
         self.overlay_timer.timeout.connect(self._tick_bullet_overlay)
 
         self.current_profile_name = "Default"
         self.current_profile_data = self.profile_store.load_profile(self.current_profile_name)
+        self._movement_hotkey_disabled: set[str] = set()
         self._loading_profile = False
         self._closing = False
 
@@ -71,6 +76,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._refresh_devices()
         self.load_profile(self.current_profile_name)
         self.apply_all_runtime()
+        self._configure_hotkeys()
         self.overlay_timer.start(16)
 
     def _build_top_bar(self) -> QtWidgets.QWidget:
@@ -114,10 +120,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.log_tab = LogTab()
 
         self.tabs.addTab(self.shared_settings_tab, "Shared Settings")
-        self.tabs.addTab(self.movement_tab, "Movement")
+        self.tabs.addTab(self.cv_trigger_tab, "CV Aim Assist")
         self.tabs.addTab(self.recoil_tab, "Recoil")
         self.tabs.addTab(self.pixel_trigger_tab, "Pixel Trigger")
-        self.tabs.addTab(self.cv_trigger_tab, "CV Trigger")
+        self.tabs.addTab(self.movement_tab, "Movement")
         self.tabs.addTab(self.log_tab, "Log")
 
         # Connect signals
@@ -126,6 +132,25 @@ class MainWindow(QtWidgets.QMainWindow):
         self.shared_settings_tab.gsi_enabled.stateChanged.connect(self._on_gsi_changed)
         self.shared_settings_tab.gsi_host.editingFinished.connect(self._on_gsi_changed)
         self.shared_settings_tab.gsi_port.valueChanged.connect(self._on_gsi_changed)
+        self.shared_settings_tab.hotkey_cv_trigger.editingFinished.connect(self._on_hotkeys_changed)
+        self.shared_settings_tab.hotkey_recoil.editingFinished.connect(self._on_hotkeys_changed)
+        self.shared_settings_tab.hotkey_pixel_trigger.editingFinished.connect(self._on_hotkeys_changed)
+        self.shared_settings_tab.hotkey_movement.editingFinished.connect(self._on_hotkeys_changed)
+        self.shared_settings_tab.hotkey_stop_all.editingFinished.connect(self._on_hotkeys_changed)
+
+        self.shared_settings_tab.safety_enabled.stateChanged.connect(self._on_safety_changed)
+        self.shared_settings_tab.safety_obscure_names.stateChanged.connect(self._on_safety_changed)
+        self.shared_settings_tab.safety_recoil_step.valueChanged.connect(self._on_safety_changed)
+        self.shared_settings_tab.safety_recoil_noise_mix.valueChanged.connect(self._on_safety_changed)
+        self.shared_settings_tab.safety_recoil_noise_decay.valueChanged.connect(self._on_safety_changed)
+        self.shared_settings_tab.safety_pixel_cooldown.valueChanged.connect(self._on_safety_changed)
+        self.shared_settings_tab.safety_pixel_click_delay.valueChanged.connect(self._on_safety_changed)
+        self.shared_settings_tab.safety_pixel_poll.valueChanged.connect(self._on_safety_changed)
+        self.shared_settings_tab.safety_cv_prediction.valueChanged.connect(self._on_safety_changed)
+        self.shared_settings_tab.safety_cv_sleep.valueChanged.connect(self._on_safety_changed)
+        self.shared_settings_tab.safety_cv_click_hold.valueChanged.connect(self._on_safety_changed)
+        self.shared_settings_tab.safety_cv_cooldown.valueChanged.connect(self._on_safety_changed)
+        self.shared_settings_tab.safety_cv_eased.stateChanged.connect(self._on_safety_changed)
 
         # Connect component config changed signals
         for section in self.movement_tab.sections.values():
@@ -259,6 +284,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.recoil_tab.load_config(deep_get(self.current_profile_data, "components.recoil", {}))
             self.pixel_trigger_tab.load_config(deep_get(self.current_profile_data, "components.pixel_trigger", {}))
             self.cv_trigger_tab.load_config(deep_get(self.current_profile_data, "components.cv_trigger", {}))
+            self._movement_hotkey_disabled.clear()
+            self._configure_hotkeys()
         finally:
             self._loading_profile = False
 
@@ -272,6 +299,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.runtime.configure_all(self.current_profile_data)
         self.runtime.configure_gsi(deep_get(self.current_profile_data, "app.gsi", {}))
         self.runtime.apply_enabled_states(self.current_profile_data)
+        self._configure_hotkeys()
         self._append_log("app", f"Applied profile '{self.current_profile_name}'.")
 
     def _sync_current_profile_from_widgets(self) -> None:
@@ -280,6 +308,8 @@ class MainWindow(QtWidgets.QMainWindow):
             deep_set(self.current_profile_data, f"app.gsi.{key}", value)
         for key, value in shared_config.get("shared", {}).items():
             deep_set(self.current_profile_data, f"app.shared.{key}", value)
+        for key, value in shared_config.get("hotkeys", {}).items():
+            deep_set(self.current_profile_data, f"app.hotkeys.{key}", value)
 
         movement_config = self.movement_tab.extract_config()
         for name, config in movement_config.items():
@@ -318,6 +348,94 @@ class MainWindow(QtWidgets.QMainWindow):
         self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)
         for name in ("bhop", "snap_tap", "counter_strafe", "recoil", "cv_trigger"):
             self.runtime.restart_component(name, self.current_profile_data)
+
+    def _on_hotkeys_changed(self) -> None:
+        if self._loading_profile:
+            return
+        self._sync_current_profile_from_widgets()
+        self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)
+        self._configure_hotkeys()
+
+    def _on_safety_changed(self) -> None:
+        if self._loading_profile:
+            return
+        self._sync_current_profile_from_widgets()
+        self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)
+        for name in ("recoil", "pixel_trigger", "cv_trigger"):
+            self.runtime.restart_component(name, self.current_profile_data)
+
+    def _configure_hotkeys(self) -> None:
+        if self._closing or not hasattr(self, "current_profile_data"):
+            return
+        hotkeys = dict(deep_get(self.current_profile_data, "app.hotkeys", {}) or {})
+        try:
+            self.hotkeys.configure({key: str(value) for key, value in hotkeys.items()})
+        except Exception as exc:
+            self._append_log("hotkeys", f"[ERROR] Failed to configure hotkeys: {exc}")
+
+    def _on_hotkey_activated(self, action: str) -> None:
+        if self._closing:
+            return
+        if action == "cv_trigger":
+            self._toggle_component_enabled("cv_trigger")
+        elif action == "recoil":
+            self._toggle_component_enabled("recoil")
+        elif action == "pixel_trigger":
+            self._toggle_component_enabled("pixel_trigger")
+        elif action == "movement":
+            self._toggle_movement_enabled()
+        elif action == "stop_all":
+            self.runtime.stop_all()
+            self._append_log("hotkeys", "[INFO] Stop All triggered by hotkey.")
+
+    def _toggle_component_enabled(self, name: str) -> None:
+        self._sync_current_profile_from_widgets()
+        current = bool(deep_get(self.current_profile_data, f"components.{name}.enabled", False))
+        self._set_component_enabled(name, not current)
+        state = "enabled" if not current else "disabled"
+        self._append_log("hotkeys", f"[INFO] {name} {state} by hotkey.")
+
+    def _toggle_movement_enabled(self) -> None:
+        self._sync_current_profile_from_widgets()
+        enabled = {
+            name
+            for name in _MOVEMENT_COMPONENTS
+            if bool(deep_get(self.current_profile_data, f"components.{name}.enabled", False))
+        }
+        if enabled:
+            self._movement_hotkey_disabled = set(enabled)
+            for name in enabled:
+                self._set_component_enabled(name, False, save=False)
+            self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)
+            self._append_log("hotkeys", "[INFO] Movement disabled by hotkey.")
+            return
+
+        if not self._movement_hotkey_disabled:
+            self._append_log("hotkeys", "[INFO] No movement components to restore from hotkey.")
+            return
+
+        restored = sorted(self._movement_hotkey_disabled)
+        for name in restored:
+            self._set_component_enabled(name, True, save=False)
+        self._movement_hotkey_disabled.clear()
+        self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)
+        self._append_log("hotkeys", "[INFO] Movement restored by hotkey.")
+
+    def _set_component_enabled(self, name: str, enabled: bool, save: bool = True) -> None:
+        deep_set(self.current_profile_data, f"components.{name}.enabled", enabled)
+        if name in _MOVEMENT_COMPONENTS:
+            section = self.movement_tab.get_section(name)
+            if section is not None:
+                section.load_config(deep_get(self.current_profile_data, f"components.{name}", {}))
+        elif name == "recoil":
+            self.recoil_tab.load_config(deep_get(self.current_profile_data, "components.recoil", {}))
+        elif name == "pixel_trigger":
+            self.pixel_trigger_tab.load_config(deep_get(self.current_profile_data, "components.pixel_trigger", {}))
+        elif name == "cv_trigger":
+            self.cv_trigger_tab.load_config(deep_get(self.current_profile_data, "components.cv_trigger", {}))
+        self.runtime.restart_component(name, self.current_profile_data)
+        if save:
+            self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)
 
     def _on_gsi_changed(self) -> None:
         if self._loading_profile:
@@ -366,6 +484,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self._closing = True
+        self.hotkeys.stop()
         self.bullet_overlay.hide_overlay()
         for component in self.runtime.components.values():
             component.set_status_callback(lambda *_args, **_kwargs: None)

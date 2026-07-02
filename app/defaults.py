@@ -22,6 +22,34 @@ def default_profile() -> dict[str, Any]:
                 "keyboard_device_path": "",
                 "game_sensitivity": 1.0,
             },
+            "hotkeys": {
+                "cv_trigger": "F1",
+                "recoil": "F2",
+                "pixel_trigger": "F3",
+                "movement": "F4",
+                "stop_all": "F5",
+            },
+            "safety": {
+                "enabled": False,
+                "obscure_device_names": False,
+                "recoil": {
+                    "jitter_step_fraction": 0.0,
+                    "jitter_noise_mix_fraction": 0.0,
+                    "jitter_noise_decay_fraction": 0.0,
+                },
+                "pixel_trigger": {
+                    "jitter_cooldown_fraction": 0.0,
+                    "jitter_click_delay_fraction": 0.0,
+                    "jitter_poll_fraction": 0.0,
+                },
+                "cv_trigger": {
+                    "jitter_prediction_fraction": 0.0,
+                    "jitter_sleep_fraction": 0.0,
+                    "jitter_click_hold_fraction": 0.0,
+                    "jitter_cooldown_fraction": 0.0,
+                    "eased_movement_enabled": False,
+                },
+            },
         },
         "components": {
             "bhop": {

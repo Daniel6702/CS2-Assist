@@ -24,7 +24,7 @@ class CVTriggerTab(BaseTab):
         layout.setSpacing(12)
 
         # Use the new restructured CVTriggerEditor
-        self.editor = CVTriggerEditor("cv_trigger", "CV Trigger / Aim Assist", device_service=device_service)
+        self.editor = CVTriggerEditor("cv_trigger", "CV Aim Assist", device_service=device_service)
         layout.addWidget(self.editor)
         layout.addStretch(1)
 

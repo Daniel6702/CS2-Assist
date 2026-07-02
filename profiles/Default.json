@@ -9,18 +9,46 @@
         "shared": {
             "keyboard_device_path": "/dev/input/event3",
             "game_sensitivity": 1.0
+        },
+        "hotkeys": {
+            "cv_trigger": "F1",
+            "recoil": "F2",
+            "pixel_trigger": "F3",
+            "movement": "F4",
+            "stop_all": "F5"
+        },
+        "safety": {
+            "enabled": false,
+            "obscure_device_names": false,
+            "recoil": {
+                "jitter_step_fraction": 0.0,
+                "jitter_noise_mix_fraction": 0.0,
+                "jitter_noise_decay_fraction": 0.0
+            },
+            "pixel_trigger": {
+                "jitter_cooldown_fraction": 0.0,
+                "jitter_click_delay_fraction": 0.0,
+                "jitter_poll_fraction": 0.0
+            },
+            "cv_trigger": {
+                "jitter_prediction_fraction": 0.0,
+                "jitter_sleep_fraction": 0.0,
+                "jitter_click_hold_fraction": 0.0,
+                "jitter_cooldown_fraction": 0.0,
+                "eased_movement_enabled": false
+            }
         }
     },
     "components": {
         "bhop": {
-            "enabled": false,
+            "enabled": true,
             "tap_interval_ms": 20
         },
         "snap_tap": {
             "enabled": false
         },
         "counter_strafe": {
-            "enabled": false,
+            "enabled": true,
             "base_counter_ms": 100,
             "full_speed_ms": 180,
             "min_counter_ms": 8,
@@ -93,7 +121,7 @@
                 "weapon_ump45": "UMP"
             },
             "noise": {
-                "strength_px": 0.0
+                "strength_px": 1.0
             },
             "overlay": {
                 "enabled": true,
