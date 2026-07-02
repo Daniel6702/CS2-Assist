@@ -158,7 +158,8 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-
+.omo/
+.omo
 # Spyder project settings
 .spyderproject
 .spyproject
