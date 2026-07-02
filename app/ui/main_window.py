@@ -130,7 +130,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Connect component config changed signals
         for section in self.movement_tab.sections.values():
             section.editor.config_changed.connect(self._on_component_config_changed)
-        self.recoil_tab.editor.config_changed.connect(self._on_component_config_changed)
+        self.recoil_tab.config_changed.connect(self._on_component_config_changed)
         self.pixel_trigger_tab.editor.config_changed.connect(self._on_component_config_changed)
         self.cv_trigger_tab.editor.config_changed.connect(self._on_component_config_changed)
 

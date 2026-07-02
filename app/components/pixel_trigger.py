@@ -38,8 +38,6 @@ class Config:
     monitor_index: int
     x: int | None
     y: int | None
-    debug: bool
-    dry_run: bool
 
 
 def parse_hold_key(name: str):
@@ -158,8 +156,6 @@ class PixelTriggerComponent(BaseComponent):
             monitor_index=int(self._config.get("monitor_index", 1)),
             x=None if raw_x in (None, "") else int(raw_x),
             y=None if raw_y in (None, "") else int(raw_y),
-            debug=bool(self._config.get("debug", False)),
-            dry_run=bool(self._config.get("dry_run", False)),
         )
 
         held_keys = set()
@@ -194,8 +190,6 @@ class PixelTriggerComponent(BaseComponent):
                 last_click_time = 0.0
                 pending_click = False
                 pending_click_time = 0.0
-                pending_trigger_name = None
-                pending_detected_distance = 0.0
 
                 while not self._stop.is_set():
                     now = time.perf_counter()
@@ -215,10 +209,7 @@ class PixelTriggerComponent(BaseComponent):
 
                     if pending_click:
                         if now >= pending_click_time and now - last_click_time >= cfg.cooldown:
-                            if cfg.dry_run:
-                                self.status(f"[DRY RUN] Triggered from {pending_trigger_name}, dist={pending_detected_distance:.2f}")
-                            else:
-                                mouse_controller.click(mouse.Button.left)
+                            mouse_controller.click(mouse.Button.left)
                             last_click_time = now
                             pending_click = False
                             previous_colors = current_colors
@@ -234,11 +225,8 @@ class PixelTriggerComponent(BaseComponent):
                                 changed_points.append({"name": name, "distance": dist})
 
                         if changed_points:
-                            trigger = changed_points[0]
                             pending_click = True
                             pending_click_time = now + cfg.click_delay
-                            pending_trigger_name = trigger["name"]
-                            pending_detected_distance = trigger["distance"]
 
                     time.sleep(cfg.poll_interval)
         except Exception as exc:

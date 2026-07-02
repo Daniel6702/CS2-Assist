@@ -82,8 +82,6 @@ def default_profile() -> dict[str, Any]:
                 "monitor_index": 1,
                 "x": None,
                 "y": None,
-                "debug": False,
-                "dry_run": False,
             },
             "cv_trigger": {
                 "enabled": False,

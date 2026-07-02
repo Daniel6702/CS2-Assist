@@ -54,6 +54,7 @@ def component_schemas() -> list[tuple[str, str, list[dict[str, Any]]]]:
                 {"path": "overlay.screen_scale", "label": "Spray / overlay scale", "kind": "float", "min": 0.01, "max": 2.0, "step": 0.01, "decimals": 3},
                 {"path": "overlay.diameter_px", "label": "Overlay size (px)", "kind": "int", "min": 4, "max": 64},
                 {"path": "overlay.opacity", "label": "Overlay opacity", "kind": "float", "min": 0.05, "max": 1.0, "step": 0.05, "decimals": 2},
+                {"path": "overlay.color", "label": "Overlay color", "kind": "color"},
             ],
         ),
         (
@@ -69,8 +70,6 @@ def component_schemas() -> list[tuple[str, str, list[dict[str, Any]]]]:
                 {"path": "monitor_index", "label": "Monitor index", "kind": "int", "min": 1, "max": 16},
                 {"path": "x", "label": "Fixed X", "kind": "line", "nullable": True},
                 {"path": "y", "label": "Fixed Y", "kind": "line", "nullable": True},
-                {"path": "debug", "label": "Debug", "kind": "bool"},
-                {"path": "dry_run", "label": "Dry run", "kind": "bool"},
             ],
         ),
         (

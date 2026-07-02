@@ -4,8 +4,6 @@ from typing import Any
 
 from PySide6 import QtCore, QtWidgets
 
-from app.common import parse_json_text, pretty_json
-
 
 def _infer_target_type_from_rule_ui(item: dict[str, Any]) -> str:
     target_type = str(item.get("target_type", "") or "").strip().lower()
@@ -59,7 +57,6 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.setObjectName("cvRuleEditor")
         self.setStyleSheet("QFrame#cvRuleEditor { border: 1px solid #bbb; border-radius: 6px; }")
         self._suspend = False
-        self._extra: dict[str, Any] = {}
 
         outer = QtWidgets.QVBoxLayout(self)
         outer.setContentsMargins(8, 8, 8, 8)
@@ -76,9 +73,9 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.name_edit.editingFinished.connect(self._emit_change)
         header.addWidget(self.name_edit, 1)
 
-        self.expand = QtWidgets.QToolButton(text="Details", checkable=True, checked=True)
+        self.expand = QtWidgets.QToolButton(text="Details", checkable=True, checked=False)
         self.expand.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
-        self.expand.setArrowType(QtCore.Qt.DownArrow)
+        self.expand.setArrowType(QtCore.Qt.RightArrow)
         self.expand.clicked.connect(self._toggle_expanded)
         header.addWidget(self.expand)
 
@@ -94,108 +91,160 @@ class CVRuleEditor(QtWidgets.QFrame):
         outer.addWidget(self.summary)
 
         self.content = QtWidgets.QWidget()
+        self.content.setVisible(False)
         outer.addWidget(self.content)
-        form = QtWidgets.QFormLayout(self.content)
-        form.setLabelAlignment(QtCore.Qt.AlignTop)
+        content_layout = QtWidgets.QVBoxLayout(self.content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(8)
+
+        top_row = QtWidgets.QHBoxLayout()
+        top_row.setSpacing(10)
+        content_layout.addLayout(top_row)
+
+        activation_group = QtWidgets.QGroupBox("Activation")
+        activation_form = QtWidgets.QFormLayout(activation_group)
+        activation_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        activation_form.setHorizontalSpacing(12)
+        activation_form.setVerticalSpacing(6)
+        top_row.addWidget(activation_group, 1)
 
         self.activation_mode = QtWidgets.QComboBox()
         self.activation_mode.addItems(["always", "keyboard", "mouse"])
         self.activation_mode.currentTextChanged.connect(self._update_activation_visibility)
         self.activation_mode.currentTextChanged.connect(self._emit_change)
-        form.addRow("Activation", self.activation_mode)
+        activation_form.addRow("Mode", self.activation_mode)
 
         self.activation_key = QtWidgets.QLineEdit()
         self.activation_key.setPlaceholderText("alt, shift, x, space ...")
         self.activation_key.editingFinished.connect(self._emit_change)
-        form.addRow("Activation key", self.activation_key)
+        activation_form.addRow("Key", self.activation_key)
+        self.activation_key_label = activation_form.labelForField(self.activation_key)
 
         self.activation_button = QtWidgets.QComboBox()
         self.activation_button.addItems(["left", "right", "middle", "x1", "x2"])
         self.activation_button.currentTextChanged.connect(self._emit_change)
-        form.addRow("Activation mouse button", self.activation_button)
+        activation_form.addRow("Mouse button", self.activation_button)
+        self.activation_button_label = activation_form.labelForField(self.activation_button)
+
+        filter_group = QtWidgets.QGroupBox("Target & Weapon Filters")
+        filter_form = QtWidgets.QFormLayout(filter_group)
+        filter_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        filter_form.setHorizontalSpacing(12)
+        filter_form.setVerticalSpacing(6)
+        top_row.addWidget(filter_group, 2)
 
         self.allowed_weapons = QtWidgets.QLineEdit()
         self.allowed_weapons.setPlaceholderText("weapon_ak47, ak, m4a1s")
         self.allowed_weapons.editingFinished.connect(self._emit_change)
-        form.addRow("Only for weapons", self.allowed_weapons)
+        filter_form.addRow("Only for weapons", self.allowed_weapons)
 
         self.target_type = QtWidgets.QComboBox()
         self.target_type.addItem("Type 1 (T / C)", "type1")
         self.target_type.addItem("Type 2 (TH / CH)", "type2")
         self.target_type.addItem("Both types", "both")
         self.target_type.currentIndexChanged.connect(self._emit_change)
-        form.addRow("Target type", self.target_type)
+        filter_form.addRow("Target type", self.target_type)
 
         self.only_when_scoped_visual = QtWidgets.QCheckBox()
         self.only_when_scoped_visual.stateChanged.connect(self._emit_change)
-        form.addRow("Only when visually scoped", self.only_when_scoped_visual)
+        filter_form.addRow("Visually scoped only", self.only_when_scoped_visual)
 
-        self.auto_shoot = QtWidgets.QCheckBox()
-        self.auto_shoot.stateChanged.connect(self._emit_change)
-        form.addRow("Auto shoot", self.auto_shoot)
+        tuning_row = QtWidgets.QHBoxLayout()
+        tuning_row.setSpacing(10)
+        content_layout.addLayout(tuning_row)
 
-        self.spray_target_offset_enabled = QtWidgets.QCheckBox()
-        self.spray_target_offset_enabled.stateChanged.connect(self._emit_change)
-        form.addRow("Use recoil spray offset", self.spray_target_offset_enabled)
+        aim_group = QtWidgets.QGroupBox("Aim Tuning")
+        aim_form = QtWidgets.QFormLayout(aim_group)
+        aim_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        aim_form.setHorizontalSpacing(12)
+        aim_form.setVerticalSpacing(6)
+        tuning_row.addWidget(aim_group, 1)
 
         self.aim_mode = QtWidgets.QComboBox()
         self.aim_mode.addItems(["head", "body"])
         self.aim_mode.currentTextChanged.connect(self._emit_change)
-        form.addRow("Aim mode", self.aim_mode)
+        aim_form.addRow("Aim mode", self.aim_mode)
 
         self.head_offset = QtWidgets.QDoubleSpinBox()
         self.head_offset.setRange(-5.0, 5.0)
         self.head_offset.setDecimals(4)
         self.head_offset.setSingleStep(0.01)
         self.head_offset.valueChanged.connect(self._emit_change)
-        form.addRow("Head offset", self.head_offset)
+        aim_form.addRow("Head offset", self.head_offset)
 
         self.snap_distance = QtWidgets.QSpinBox()
         self.snap_distance.setRange(0, 5000)
         self.snap_distance.valueChanged.connect(self._emit_change)
-        form.addRow("Snap distance", self.snap_distance)
+        aim_form.addRow("Snap distance", self.snap_distance)
 
-        self.settle_frames = QtWidgets.QSpinBox()
-        self.settle_frames.setRange(0, 100)
-        self.settle_frames.valueChanged.connect(self._emit_change)
-        form.addRow("Settle frames", self.settle_frames)
-
-        self.click_hold_ms = QtWidgets.QSpinBox()
-        self.click_hold_ms.setRange(0, 5000)
-        self.click_hold_ms.valueChanged.connect(self._emit_change)
-        form.addRow("Click hold ms", self.click_hold_ms)
-
-        self.cooldown_ms = QtWidgets.QSpinBox()
-        self.cooldown_ms.setRange(0, 5000)
-        self.cooldown_ms.valueChanged.connect(self._emit_change)
-        form.addRow("Cooldown ms", self.cooldown_ms)
+        self.spray_target_offset_enabled = QtWidgets.QCheckBox()
+        self.spray_target_offset_enabled.stateChanged.connect(self._emit_change)
+        aim_form.addRow("Use recoil spray offset", self.spray_target_offset_enabled)
 
         self.sens_coeff = QtWidgets.QDoubleSpinBox()
         self.sens_coeff.setRange(0.0, 100.0)
         self.sens_coeff.setDecimals(4)
         self.sens_coeff.setSingleStep(0.01)
         self.sens_coeff.valueChanged.connect(self._emit_change)
-        form.addRow("Sensitivity coeff", self.sens_coeff)
+        aim_form.addRow("Sensitivity coeff", self.sens_coeff)
+
+        timing_group = QtWidgets.QGroupBox("Auto Shoot")
+        timing_layout = QtWidgets.QHBoxLayout(timing_group)
+        timing_layout.setContentsMargins(8, 8, 8, 8)
+        timing_layout.setSpacing(12)
+        timing_form = QtWidgets.QFormLayout()
+        timing_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        timing_form.setHorizontalSpacing(12)
+        timing_form.setVerticalSpacing(6)
+        threshold_form = QtWidgets.QFormLayout()
+        threshold_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        threshold_form.setHorizontalSpacing(12)
+        threshold_form.setVerticalSpacing(6)
+        timing_layout.addLayout(timing_form, 1)
+        timing_layout.addLayout(threshold_form, 1)
+        tuning_row.addWidget(timing_group, 1)
+
+        self.auto_shoot = QtWidgets.QCheckBox()
+        self.auto_shoot.stateChanged.connect(self._emit_change)
+        timing_form.addRow("Enable", self.auto_shoot)
+
+        self.settle_frames = QtWidgets.QSpinBox()
+        self.settle_frames.setRange(0, 100)
+        self.settle_frames.valueChanged.connect(self._emit_change)
+        timing_form.addRow("Settle frames", self.settle_frames)
+
+        self.click_hold_ms = QtWidgets.QSpinBox()
+        self.click_hold_ms.setRange(0, 5000)
+        self.click_hold_ms.valueChanged.connect(self._emit_change)
+        timing_form.addRow("Click hold ms", self.click_hold_ms)
+
+        self.cooldown_ms = QtWidgets.QSpinBox()
+        self.cooldown_ms.setRange(0, 5000)
+        self.cooldown_ms.valueChanged.connect(self._emit_change)
+        timing_form.addRow("Cooldown ms", self.cooldown_ms)
 
         self.cross_x_thresh = QtWidgets.QSpinBox()
         self.cross_x_thresh.setRange(0, 2000)
         self.cross_x_thresh.valueChanged.connect(self._emit_change)
-        form.addRow("Cross X threshold", self.cross_x_thresh)
+        threshold_form.addRow("Cross X threshold", self.cross_x_thresh)
 
         self.cross_y_top = QtWidgets.QSpinBox()
         self.cross_y_top.setRange(-2000, 2000)
         self.cross_y_top.valueChanged.connect(self._emit_change)
-        form.addRow("Cross Y top", self.cross_y_top)
+        threshold_form.addRow("Cross Y top", self.cross_y_top)
 
         self.cross_y_bot = QtWidgets.QSpinBox()
         self.cross_y_bot.setRange(-2000, 2000)
         self.cross_y_bot.valueChanged.connect(self._emit_change)
-        form.addRow("Cross Y bottom", self.cross_y_bot)
+        threshold_form.addRow("Cross Y bottom", self.cross_y_bot)
 
-        self.extra_json = QtWidgets.QPlainTextEdit()
-        self.extra_json.setFixedHeight(70)
-        self.extra_json.textChanged.connect(self._emit_change)
-        form.addRow("Extra JSON", self.extra_json)
+        input_row_height = self.aim_mode.sizeHint().height()
+        for checkbox in (
+            self.only_when_scoped_visual,
+            self.spray_target_offset_enabled,
+            self.auto_shoot,
+        ):
+            checkbox.setMinimumHeight(input_row_height)
 
         self._update_activation_visibility()
         self._update_summary()
@@ -213,14 +262,8 @@ class CVRuleEditor(QtWidgets.QFrame):
         mode = self.activation_mode.currentText().strip().lower()
         self.activation_key.setVisible(mode == "keyboard")
         self.activation_button.setVisible(mode == "mouse")
-        form = self.content.layout()
-        if isinstance(form, QtWidgets.QFormLayout):
-            key_label = form.labelForField(self.activation_key)
-            btn_label = form.labelForField(self.activation_button)
-            if key_label is not None:
-                key_label.setVisible(mode == "keyboard")
-            if btn_label is not None:
-                btn_label.setVisible(mode == "mouse")
+        self.activation_key_label.setVisible(mode == "keyboard")
+        self.activation_button_label.setVisible(mode == "mouse")
         self._update_summary()
 
     def _target_type_value(self) -> str:
@@ -254,7 +297,6 @@ class CVRuleEditor(QtWidgets.QFrame):
         self._suspend = True
         try:
             data = dict(rule or {})
-            self._extra = {k: v for k, v in data.items() if k not in self._KNOWN_KEYS and k not in {"CLASSES", "only_when_scoped"}}
             self.name_edit.setText(name)
             self.enabled.setChecked(bool(data.get("enabled", True)))
 
@@ -291,7 +333,6 @@ class CVRuleEditor(QtWidgets.QFrame):
             self.cross_x_thresh.setValue(int(data.get("CROSS_X_THRESH", 14)))
             self.cross_y_top.setValue(int(data.get("CROSS_Y_THRESH_TOP", 18)))
             self.cross_y_bot.setValue(int(data.get("CROSS_Y_THRESH_BOT", 32)))
-            self.extra_json.setPlainText(pretty_json(self._extra))
             self._sync_header_title()
             self._update_activation_visibility()
         finally:
@@ -299,13 +340,7 @@ class CVRuleEditor(QtWidgets.QFrame):
             self._update_summary()
 
     def extract_rule(self) -> tuple[str, dict[str, Any]]:
-        data = dict(self._extra)
-        extra_raw = self.extra_json.toPlainText().strip()
-        if extra_raw:
-            parsed_extra = parse_json_text(extra_raw)
-            if not isinstance(parsed_extra, dict):
-                raise ValueError("Extra JSON must be an object/dict.")
-            data.update(parsed_extra)
+        data: dict[str, Any] = {}
 
         data["enabled"] = self.enabled.isChecked()
         mode = self.activation_mode.currentText().strip().lower()

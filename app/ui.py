@@ -1495,8 +1495,6 @@ def component_schemas() -> list[tuple[str, str, list[dict[str, Any]]]]:
                 {"path": "monitor_index", "label": "Monitor index", "kind": "int", "min": 1, "max": 16},
                 {"path": "x", "label": "Fixed X", "kind": "line", "nullable": True},
                 {"path": "y", "label": "Fixed Y", "kind": "line", "nullable": True},
-                {"path": "debug", "label": "Debug", "kind": "bool"},
-                {"path": "dry_run", "label": "Dry run", "kind": "bool"},
             ],
         ),
         (

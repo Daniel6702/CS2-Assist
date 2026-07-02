@@ -124,7 +124,7 @@ QPlainTextEdit:disabled {
     color: #6a6a6a;
 }
 
-QComboBox::drop-down,
+/* SpinBox buttons - clear visual separation with direction indicators */
 QSpinBox::up-button,
 QSpinBox::down-button,
 QDoubleSpinBox::up-button,
@@ -132,15 +132,59 @@ QDoubleSpinBox::down-button {
     background-color: #2d2d30;
     border: none;
     border-left: 1px solid #3c3c3c;
-    width: 20px;
+    width: 22px;
+    subcontrol-origin: border;
 }
 
-QComboBox::drop-down:hover,
+QSpinBox::up-button,
+QDoubleSpinBox::up-button {
+    subcontrol-position: top right;
+    border-top-right-radius: 5px;
+    /* Up arrow using border triangle */
+    background-image: none;
+}
+
+QSpinBox::down-button,
+QDoubleSpinBox::down-button {
+    subcontrol-position: bottom right;
+    border-bottom-right-radius: 5px;
+}
+
+/* Style the buttons to show direction via background gradient */
+QSpinBox::up-button,
+QDoubleSpinBox::up-button {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3a3a3f, stop:1 #2d2d30);
+}
+
+QSpinBox::down-button,
+QDoubleSpinBox::down-button {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #2d2d30, stop:1 #3a3a3f);
+}
+
+/* Hover states */
 QSpinBox::up-button:hover,
 QSpinBox::down-button:hover,
 QDoubleSpinBox::up-button:hover,
 QDoubleSpinBox::down-button:hover {
-    background-color: #333337;
+    background-color: #0078d4;
+    border-left-color: #0078d4;
+}
+
+/* Pressed states */
+QSpinBox::up-button:pressed,
+QSpinBox::down-button:pressed,
+QDoubleSpinBox::up-button:pressed,
+QDoubleSpinBox::down-button:pressed {
+    background-color: #005a9e;
+}
+
+/* Disabled state */
+QSpinBox:disabled::up-button,
+QSpinBox:disabled::down-button,
+QDoubleSpinBox:disabled::up-button,
+QDoubleSpinBox:disabled::down-button {
+    background-color: #202020;
+    border-left-color: #333333;
 }
 
 QComboBox QAbstractItemView {

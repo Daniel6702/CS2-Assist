@@ -2,10 +2,39 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6 import QtCore, QtWidgets
+from PySide6 import QtCore, QtGui, QtWidgets
 
 from app.common import deep_get, deep_set, parse_json_text, pretty_json
 from app.device_service import DeviceService
+
+
+class ColorButton(QtWidgets.QPushButton):
+    color_changed = QtCore.Signal(QtGui.QColor)
+
+    def __init__(self, color: QtGui.QColor = QtGui.QColor(255, 0, 0), parent=None) -> None:
+        super().__init__(parent)
+        self._color = color
+        self.setFixedSize(28, 20)
+        self.clicked.connect(self._pick_color)
+        self._update_style()
+
+    def _update_style(self) -> None:
+        self.setStyleSheet(f"background-color: {self._color.name()}; border: 1px solid #555; border-radius: 3px;")
+
+    def _pick_color(self) -> None:
+        dialog = QtWidgets.QColorDialog(self._color, self)
+        dialog.setOption(QtWidgets.QColorDialog.ShowAlphaChannel, True)
+        if dialog.exec() == QtWidgets.QDialog.Accepted:
+            self._color = dialog.selectedColor()
+            self._update_style()
+            self.color_changed.emit(self._color)
+
+    def color(self) -> QtGui.QColor:
+        return self._color
+
+    def set_color(self, color: QtGui.QColor) -> None:
+        self._color = color
+        self._update_style()
 
 
 class ComponentEditor(QtWidgets.QGroupBox):
@@ -81,6 +110,10 @@ class ComponentEditor(QtWidgets.QGroupBox):
             widget.setFixedHeight(spec.get("height", 140))
             widget.textChanged.connect(self._emit_change)
             return widget
+        if kind == "color":
+            widget = ColorButton()
+            widget.color_changed.connect(self._emit_change)
+            return widget
         raise ValueError(f"Unsupported widget kind: {kind}")
 
     def refresh_devices(self) -> None:
@@ -135,6 +168,14 @@ class ComponentEditor(QtWidgets.QGroupBox):
                 elif kind == "json":
                     assert isinstance(widget, QtWidgets.QPlainTextEdit)
                     widget.setPlainText(pretty_json(value))
+                elif kind == "color":
+                    assert isinstance(widget, ColorButton)
+                    if isinstance(value, str):
+                        widget.set_color(QtGui.QColor(value))
+                    elif isinstance(value, (list, tuple)) and len(value) >= 3:
+                        widget.set_color(QtGui.QColor(*value[:3]))
+                    else:
+                        widget.set_color(QtGui.QColor(255, 0, 0))
         finally:
             self._suspend = False
 
@@ -166,6 +207,10 @@ class ComponentEditor(QtWidgets.QGroupBox):
             elif kind == "json":
                 assert isinstance(widget, QtWidgets.QPlainTextEdit)
                 value = parse_json_text(widget.toPlainText())
+            elif kind == "color":
+                assert isinstance(widget, ColorButton)
+                c = widget.color()
+                value = [c.red(), c.green(), c.blue(), c.alpha()]
             else:
                 raise ValueError(f"Unsupported kind {kind}")
             deep_set(config, path, value)

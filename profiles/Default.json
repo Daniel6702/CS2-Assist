@@ -99,7 +99,13 @@
                 "enabled": true,
                 "diameter_px": 8,
                 "opacity": 1.0,
-                "screen_scale": 0.15
+                "screen_scale": 0.15,
+                "color": [
+                    255,
+                    0,
+                    0,
+                    255
+                ]
             },
             "return_mouse": {
                 "enabled": true,
@@ -117,9 +123,7 @@
             "poll_interval": 0.0001,
             "monitor_index": 1,
             "x": null,
-            "y": null,
-            "debug": false,
-            "dry_run": false
+            "y": null
         },
         "cv_trigger": {
             "enabled": true,
@@ -164,7 +168,7 @@
                     "HEAD_OFFSET": 0.12,
                     "SNAP_DISTANCE": 0,
                     "SETTLE_FRAMES": 1,
-                    "CLICK_HOLD_MS": 15,
+                    "CLICK_HOLD_MS": 14,
                     "COOLDOWN_MS": 600,
                     "SENS_COEFF": 2.5,
                     "CROSS_X_THRESH": 25,
