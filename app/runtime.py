@@ -6,7 +6,7 @@ from typing import Callable
 from app.components.base import BaseComponent
 from app.components.bhop import BhopComponent
 from app.components.counter_strafe import CounterStrafeComponent
-from app.components.cv_trigger import CVTriggerComponent
+from app.components import CVTriggerComponent
 from app.components.pixel_trigger import PixelTriggerComponent
 from app.components.recoil import RecoilComponent
 from app.components.snap_tap import SnapTapComponent

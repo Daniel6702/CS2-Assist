@@ -1,0 +1,246 @@
+# CS2 Assist
+
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+![License](https://img.shields.io/badge/license-not%20specified-lightgrey)
+![Platform](https://img.shields.io/badge/platform-linux-lightgrey)
+
+CS2 Assist is a Python/PySide6 desktop application for configuring and running Counter-Strike 2 assistance components from JSON profiles. The application starts a Qt GUI, stores settings in `profiles/*.json`, optionally listens for CS2 Game State Integration (GSI) data, and coordinates runtime components through a shared manager.
+
+## Table Of Contents
+
+- [Overview](#overview)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Architecture](#architecture)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+
+## Overview
+
+CS2 Assist provides a GUI for profile-based configuration of these runtime components:
+
+- Bhop
+- Snap Tap / Null Binds
+- Counter Strafe
+- Recoil Control
+- Pixel Trigger
+- CV Trigger / Aim Assist
+
+The GUI entrypoint is `app/main.py`. It creates a `QApplication`, applies the application style, opens `MainWindow`, and starts the Qt event loop. `MainWindow` loads the selected profile, renders tabs for shared settings, GSI, and each component, saves profile edits, and applies runtime changes.
+
+## Requirements
+
+- Python 3.10+
+- Linux for keyboard filtering and virtual input support
+- Counter-Strike 2
+- CS2 Game State Integration (GSI) if GSI gating or weapon-aware behavior is enabled
+- Permission to read Linux input event devices such as `/dev/input/event*`
+- Permission to create virtual input devices through `uinput`
+
+Python dependencies are listed in `requirements.txt`:
+
+- `PySide6` for the desktop UI
+- `evdev` and `python-uinput` for Linux input capture and virtual devices
+- `mss`, `numpy`, `opencv-python`, `torch`, and `ultralytics` for screen capture and CV trigger inference
+- `pynput` and `pyautogui` for keyboard/mouse interaction paths
+
+## Installation
+
+Install Python dependencies from the project root:
+
+```bash
+pip install -r requirements.txt
+```
+
+Load the Linux `uinput` module before running components that create virtual input devices:
+
+```bash
+sudo modprobe uinput
+```
+
+If `uinput` is not available after reboot, configure your system to load it at boot. The exact location is distribution-specific, but a common setup is:
+
+```bash
+echo uinput | sudo tee /etc/modules-load.d/uinput.conf
+```
+
+Grant your user access to input devices and `uinput`. One common udev rule is:
+
+```udev
+KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"
+KERNEL=="event*", SUBSYSTEM=="input", GROUP="input", MODE="0660"
+```
+
+For example, place those rules in `/etc/udev/rules.d/99-cs2-assist-input.rules`, reload udev, and add your user to the `input` group:
+
+```bash
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+sudo usermod -aG input "$USER"
+```
+
+Log out and back in after changing group membership.
+
+Configure CS2 GSI to send JSON POST requests to the host and port shown in the GSI tab. The default profile uses:
+
+```text
+http://127.0.0.1:3000
+```
+
+## Usage
+
+Run the application from the project root:
+
+```bash
+python app/main.py
+```
+
+In the GUI:
+
+1. Choose or create a profile from the top bar.
+2. Select a keyboard input device in Shared Settings, or leave it on auto-detect.
+3. Configure GSI host/port if GSI is enabled.
+4. Enable and tune individual component tabs.
+5. Click `Save` to persist the profile and `Apply` to restart runtime configuration.
+6. Use `Stop All` to stop running components and the GSI server.
+
+## Configuration
+
+Profiles are stored as JSON files under `profiles/`. The included `profiles/Default.json` shows the current profile shape:
+
+```json
+{
+    "name": "Default",
+    "app": {
+        "gsi": {
+            "enabled": true,
+            "host": "127.0.0.1",
+            "port": 3000
+        },
+        "shared": {
+            "keyboard_device_path": "/dev/input/event3",
+            "game_sensitivity": 1.0
+        }
+    },
+    "components": {}
+}
+```
+
+### Profiles
+
+`ProfileStore` reads and writes `profiles/<name>.json`. Profile names are sanitized to letters, numbers, underscores, and hyphens before the file path is built. If no profile exists, a default profile is created from `app/defaults.py`.
+
+The top bar supports:
+
+- New profile
+- Duplicate profile
+- Delete profile, except `Default`
+- Save profile
+- Apply profile
+- Refresh Devices
+- Stop All
+
+### Shared Settings
+
+Shared settings live at `app.shared` in each profile.
+
+- `keyboard_device_path`: used by keyboard-based features. The Shared Settings tab can auto-detect or select a Linux keyboard device discovered by `DeviceService`.
+- `game_sensitivity`: used by recoil and CV trigger sensitivity scaling.
+
+`RuntimeManager` injects the shared keyboard device into Bhop, Snap Tap, and Counter Strafe. It injects the shared game sensitivity into Recoil and CV Trigger runtime configuration.
+
+### GSI
+
+GSI settings live at `app.gsi` in each profile.
+
+- `enabled`: starts or disables the local GSI server.
+- `host`: default `127.0.0.1`.
+- `port`: default `3000`.
+
+When GSI is enabled, `RuntimeManager` keeps automation gated until GSI reports that the player is alive. `GSIServer` accepts JSON POST requests, parses weapon, ammo, health, round phase, and map data into `GameState`, then dispatches that state to components.
+
+When GSI is disabled, the runtime gate is opened without waiting for GSI state.
+
+### Components
+
+Component settings live under `components` in each profile.
+
+- `bhop`: Linux keyboard component for space-bar bhop behavior. It uses the configured keyboard device and `tap_interval_ms`.
+- `snap_tap`: Linux keyboard component for W/A/S/D last-key movement behavior.
+- `counter_strafe`: Linux keyboard component with counter-strafe timing settings such as base, full-speed, min/max, shift/ctrl factors, curve, and manual brake windows.
+- `recoil`: Mouse recoil control using `resources/mouse_patterns.json`, GSI weapon state when available, sensitivity scaling, movement frequency, axis strength, optional noise, return-mouse behavior, and an optional bullet overlay.
+- `pixel_trigger`: Screen-pixel based trigger component using `mss`, a hold key, color-change threshold, click delay, cooldown, polling interval, monitor index, optional fixed coordinates, debug, and dry-run settings.
+- `cv_trigger`: Computer-vision trigger/aim component using `resources/best.pt`, monitor/game-resolution settings, target-side settings, inference thresholds, smoothing/prediction values, and per-rule activation/weapon/target/click settings.
+
+## Architecture
+
+- `app/main.py`: GUI entrypoint. Creates `QApplication`, applies style, constructs `MainWindow`, and starts the event loop.
+- `app/ui/main_window.py`: main UI controller. Builds the profile toolbar, tab widget, log view, shared settings tab, GSI tab, and component tabs.
+- `app/runtime.py`: owns `RuntimeManager`, creates component instances, applies profile configuration, starts/stops components, configures GSI, and forwards GSI state.
+- `app/gsi.py`: implements `GSIServer` and `GameState`. The server runs a threaded HTTP listener and handles JSON POST payloads from CS2 GSI.
+- `app/profile_store.py`: implements `ProfileStore` for creating, loading, saving, listing, and deleting JSON profiles.
+- `app/device_service.py`: lists Linux keyboard devices through `evdev` and monitor geometry through `mss`.
+- `app/platform/linux_input.py`: shared Linux keyboard hub built on `evdev` and `uinput`; used by keyboard-filtering components.
+- `app/components/`: component implementations for Bhop, Snap Tap, Counter Strafe, Recoil Control, Pixel Trigger, and CV Trigger.
+- `app/ui/tabs/`: Qt tabs for Shared Settings, GSI, and component configuration.
+- `app/ui/widgets/`: reusable widgets such as component editors, CV rule editors, log bridge, collapsible boxes, and bullet overlay.
+
+The runtime flow is:
+
+1. `MainWindow` loads a profile through `ProfileStore`.
+2. UI widgets edit the profile dictionary.
+3. Saving writes the profile JSON back to `profiles/`.
+4. Applying calls `RuntimeManager.configure_all()`, `RuntimeManager.configure_gsi()`, and `RuntimeManager.apply_enabled_states()`.
+5. `RuntimeManager` starts enabled components and gates automation from GSI state when GSI is enabled.
+
+## Troubleshooting
+
+### uinput permission denied
+
+Symptoms include errors when creating virtual keyboards or virtual mice, or components reporting that Linux `evdev/uinput` is unavailable.
+
+Check that `uinput` is loaded:
+
+```bash
+lsmod | grep uinput
+```
+
+If it is missing, load it:
+
+```bash
+sudo modprobe uinput
+```
+
+Check permissions for `/dev/uinput` and the selected `/dev/input/event*` keyboard device. If your user cannot read the keyboard event device or write to `uinput`, update udev rules and group membership as shown in [Installation](#installation), then log out and back in.
+
+### GSI not receiving data
+
+The GSI tab shows the last state received from the local GSI server. If it stays at `No data yet.`:
+
+- Confirm GSI is enabled in the profile.
+- Confirm the host and port match the CS2 GSI configuration.
+- Confirm nothing else is using the configured port.
+- Apply the profile again and check the log for `GSI listening on http://<host>:<port>` or `Failed to start GSI server`.
+- Remember that when GSI is enabled, features stay gated until GSI reports the player is alive.
+
+### model not found
+
+CV Trigger requires the model path configured at `components.cv_trigger.model_path`. The default project resource is `resources/best.pt`, and `profiles/Default.json` points to that file in this checkout.
+
+If the log reports `Model not found`, update the CV Trigger model path in the profile or restore the missing model file.
+
+### device not detected
+
+The Shared Settings tab lists keyboard devices discovered by `DeviceService` using `evdev`. If the list is empty or the expected keyboard is missing:
+
+- Confirm the application is running on Linux.
+- Confirm `evdev` is installed from `requirements.txt`.
+- Confirm your user can read `/dev/input/event*` devices.
+- Click `Refresh Devices` after changing permissions or reconnecting hardware.
+- Use Auto-detect if the selected saved device path no longer exists.
+
+## License
+
+No license file is present in this repository. Add a license file before distributing or reusing the project under specific license terms.

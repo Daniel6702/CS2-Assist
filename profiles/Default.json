@@ -14,16 +14,13 @@
     "components": {
         "bhop": {
             "enabled": false,
-            "device_path": "/dev/input/event3",
             "tap_interval_ms": 20
         },
         "snap_tap": {
-            "enabled": false,
-            "device_path": "/dev/input/event4"
+            "enabled": false
         },
         "counter_strafe": {
             "enabled": false,
-            "device_path": "/dev/input/event3",
             "base_counter_ms": 100,
             "full_speed_ms": 180,
             "min_counter_ms": 8,
@@ -153,7 +150,8 @@
                 "awp": {
                     "enabled": false,
                     "activation": {
-                        "mode": "always"
+                        "device": "keyboard",
+                        "key": "alt"
                     },
                     "allowed_weapons": [
                         "weapon_awp"
