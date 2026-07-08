@@ -8,6 +8,7 @@ class BulletImpactOverlay(QtWidgets.QWidget):
         super().__init__(None)
         self._diameter = 12
         self._opacity = 0.9
+        self._active = False
 
         self.setWindowFlags(
             QtCore.Qt.FramelessWindowHint
@@ -25,7 +26,9 @@ class BulletImpactOverlay(QtWidgets.QWidget):
         self._raise_timer.timeout.connect(self._keep_on_top)
         self._raise_timer.start(250)
 
-        self.hide()
+        # Show once at init so the compositor creates the surface once.
+        # Never hide/show again to avoid compositor GPU surface reallocation.
+        self.show()
 
     def _apply_shape(self) -> None:
         self.setFixedSize(self._diameter, self._diameter)
@@ -42,23 +45,28 @@ class BulletImpactOverlay(QtWidgets.QWidget):
             self.update()
 
     def _keep_on_top(self) -> None:
-        if self.isVisible():
+        if self._active:
             self.raise_()
 
     def show_point(self, center_x: float, center_y: float) -> None:
         x = int(round(center_x - self._diameter / 2))
         y = int(round(center_y - self._diameter / 2))
         self.move(x, y)
-        if not self.isVisible():
-            self.show()
+        self._active = True
         self.raise_()
         self.update()
 
     def hide_overlay(self) -> None:
-        self.hide()
+        self._active = False
+        self.update()
 
     def paintEvent(self, event) -> None:
         painter = QtGui.QPainter(self)
+        if not self._active:
+            # Wipe any previous drawing so the widget stays transparent.
+            painter.setCompositionMode(QtGui.QPainter.CompositionMode_Source)
+            painter.fillRect(self.rect(), QtCore.Qt.transparent)
+            return
         painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
         painter.setPen(QtCore.Qt.NoPen)
         alpha = max(1, min(255, int(round(self._opacity * 255))))

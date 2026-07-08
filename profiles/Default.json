@@ -15,7 +15,8 @@
             "recoil": "F2",
             "pixel_trigger": "F3",
             "movement": "F4",
-            "stop_all": "F5"
+            "stop_all": "F5",
+            "overlay": "Insert"
         },
         "safety": {
             "enabled": false,
@@ -45,10 +46,10 @@
             "tap_interval_ms": 20
         },
         "snap_tap": {
-            "enabled": false
+            "enabled": true
         },
         "counter_strafe": {
-            "enabled": true,
+            "enabled": false,
             "base_counter_ms": 100,
             "full_speed_ms": 180,
             "min_counter_ms": 8,
@@ -70,7 +71,7 @@
             "auto_select_from_gsi": true,
             "axis_strength_percent": {
                 "x": 100.0,
-                "y": 100.0
+                "y": 95.0
             },
             "sensitivity": {
                 "apply_to_axis": {
@@ -121,11 +122,11 @@
                 "weapon_ump45": "UMP"
             },
             "noise": {
-                "strength_px": 1.0
+                "strength_px": 0.0
             },
             "overlay": {
                 "enabled": true,
-                "diameter_px": 8,
+                "diameter_px": 6,
                 "opacity": 1.0,
                 "screen_scale": 0.15,
                 "color": [
@@ -145,8 +146,8 @@
         "pixel_trigger": {
             "enabled": true,
             "hold_key_name": "alt",
-            "threshold": 60.0,
-            "click_delay": 0.024,
+            "threshold": 50.0,
+            "click_delay": 0.02,
             "cooldown": 0.5,
             "poll_interval": 0.0001,
             "monitor_index": 1,
@@ -168,41 +169,17 @@
             },
             "use_gsi_opponent_side": false,
             "manual_target_side": "both",
-            "inference_confidence": 0.15,
-            "inference_img_size": 512,
+            "inference_confidence": 0.2,
+            "inference_img_size": 384,
             "jitter_deadzone_px": 2.0,
             "near_smoothing_alpha": 0.35,
             "near_smoothing_radius_px": 32.0,
             "x_prediction_enabled": true,
-            "x_prediction_lead_ms": 100.0,
+            "x_prediction_lead_ms": 120.0,
             "x_prediction_history_ms": 120.0,
             "x_prediction_damping": 0.7,
             "x_prediction_max_delta_px": 200.0,
             "configs": {
-                "awp": {
-                    "enabled": false,
-                    "activation": {
-                        "device": "keyboard",
-                        "key": "alt"
-                    },
-                    "allowed_weapons": [
-                        "weapon_awp"
-                    ],
-                    "target_type": "both",
-                    "only_when_scoped_visual": true,
-                    "auto_shoot": true,
-                    "spray_target_offset_enabled": false,
-                    "AIM_MODE": "body",
-                    "HEAD_OFFSET": 0.12,
-                    "SNAP_DISTANCE": 0,
-                    "SETTLE_FRAMES": 1,
-                    "CLICK_HOLD_MS": 14,
-                    "COOLDOWN_MS": 600,
-                    "SENS_COEFF": 2.5,
-                    "CROSS_X_THRESH": 25,
-                    "CROSS_Y_THRESH_TOP": 18,
-                    "CROSS_Y_THRESH_BOT": 48
-                },
                 "rifle_always": {
                     "enabled": true,
                     "activation": {
@@ -223,10 +200,12 @@
                     "spray_target_offset_enabled": true,
                     "AIM_MODE": "head",
                     "HEAD_OFFSET": 0.16,
-                    "SNAP_DISTANCE": 40,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "SNAP_DISTANCE": 35,
                     "SETTLE_FRAMES": 2,
                     "CLICK_HOLD_MS": 20,
                     "COOLDOWN_MS": 350,
+                    "auto_shoot_aim_cooldown_ms": 0,
                     "SENS_COEFF": 1.2,
                     "CROSS_X_THRESH": 30,
                     "CROSS_Y_THRESH_TOP": 20,
@@ -253,17 +232,19 @@
                     "spray_target_offset_enabled": true,
                     "AIM_MODE": "head",
                     "HEAD_OFFSET": 0.18,
-                    "SNAP_DISTANCE": 50,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "SNAP_DISTANCE": 60,
                     "SETTLE_FRAMES": 2,
                     "CLICK_HOLD_MS": 15,
                     "COOLDOWN_MS": 250,
-                    "SENS_COEFF": 1.4,
+                    "auto_shoot_aim_cooldown_ms": 0,
+                    "SENS_COEFF": 1.8,
                     "CROSS_X_THRESH": 14,
                     "CROSS_Y_THRESH_TOP": 18,
                     "CROSS_Y_THRESH_BOT": 32
                 },
                 "trigger": {
-                    "enabled": true,
+                    "enabled": false,
                     "activation": {
                         "device": "keyboard",
                         "key": "alt"
@@ -274,14 +255,16 @@
                     "spray_target_offset_enabled": false,
                     "AIM_MODE": "head",
                     "HEAD_OFFSET": 0.12,
-                    "SNAP_DISTANCE": 17,
-                    "SETTLE_FRAMES": 1,
-                    "CLICK_HOLD_MS": 15,
-                    "COOLDOWN_MS": 500,
-                    "SENS_COEFF": 1.4,
-                    "CROSS_X_THRESH": 10,
-                    "CROSS_Y_THRESH_TOP": 18,
-                    "CROSS_Y_THRESH_BOT": 32
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "SNAP_DISTANCE": 18,
+                    "SETTLE_FRAMES": 0,
+                    "CLICK_HOLD_MS": 1,
+                    "COOLDOWN_MS": 300,
+                    "auto_shoot_aim_cooldown_ms": 0,
+                    "SENS_COEFF": 0.0,
+                    "CROSS_X_THRESH": 25,
+                    "CROSS_Y_THRESH_TOP": 40,
+                    "CROSS_Y_THRESH_BOT": 40
                 },
                 "usp1": {
                     "enabled": false,
@@ -297,17 +280,19 @@
                     "spray_target_offset_enabled": false,
                     "AIM_MODE": "head",
                     "HEAD_OFFSET": 0.1,
+                    "BODY_KNEE_OFFSET": 0.5,
                     "SNAP_DISTANCE": 50,
                     "SETTLE_FRAMES": 1,
                     "CLICK_HOLD_MS": 15,
                     "COOLDOWN_MS": 350,
+                    "auto_shoot_aim_cooldown_ms": 0,
                     "SENS_COEFF": 1.2,
                     "CROSS_X_THRESH": 12,
                     "CROSS_Y_THRESH_TOP": 18,
                     "CROSS_Y_THRESH_BOT": 32
                 },
                 "usp2": {
-                    "enabled": true,
+                    "enabled": false,
                     "activation": {
                         "mode": "always"
                     },
@@ -320,10 +305,12 @@
                     "spray_target_offset_enabled": false,
                     "AIM_MODE": "head",
                     "HEAD_OFFSET": 0.1,
+                    "BODY_KNEE_OFFSET": 0.5,
                     "SNAP_DISTANCE": 40,
                     "SETTLE_FRAMES": 2,
                     "CLICK_HOLD_MS": 15,
                     "COOLDOWN_MS": 350,
+                    "auto_shoot_aim_cooldown_ms": 0,
                     "SENS_COEFF": 0.8,
                     "CROSS_X_THRESH": 4,
                     "CROSS_Y_THRESH_TOP": 18,

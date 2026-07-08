@@ -62,6 +62,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._movement_hotkey_disabled: set[str] = set()
         self._loading_profile = False
         self._closing = False
+        self._overlay_active = False
+        self._saved_window_flags: QtCore.Qt.WindowFlags | None = None
 
         central = QtWidgets.QWidget()
         self.setCentralWidget(central)
@@ -137,6 +139,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.shared_settings_tab.hotkey_pixel_trigger.editingFinished.connect(self._on_hotkeys_changed)
         self.shared_settings_tab.hotkey_movement.editingFinished.connect(self._on_hotkeys_changed)
         self.shared_settings_tab.hotkey_stop_all.editingFinished.connect(self._on_hotkeys_changed)
+        self.shared_settings_tab.hotkey_overlay.editingFinished.connect(self._on_hotkeys_changed)
 
         self.shared_settings_tab.safety_enabled.stateChanged.connect(self._on_safety_changed)
         self.shared_settings_tab.safety_obscure_names.stateChanged.connect(self._on_safety_changed)
@@ -370,6 +373,11 @@ class MainWindow(QtWidgets.QMainWindow):
         hotkeys = dict(deep_get(self.current_profile_data, "app.hotkeys", {}) or {})
         try:
             self.hotkeys.configure({key: str(value) for key, value in hotkeys.items()})
+            mode = self.hotkeys.mode
+            if mode == "fallback":
+                self._append_log("hotkeys", "[WARN] Using fallback hotkey listener (GlobalHotKeys unavailable). Hotkeys active.")
+            elif mode == "none":
+                self._append_log("hotkeys", "[INFO] No hotkeys configured.")
         except Exception as exc:
             self._append_log("hotkeys", f"[ERROR] Failed to configure hotkeys: {exc}")
 
@@ -387,6 +395,33 @@ class MainWindow(QtWidgets.QMainWindow):
         elif action == "stop_all":
             self.runtime.stop_all()
             self._append_log("hotkeys", "[INFO] Stop All triggered by hotkey.")
+        elif action == "overlay":
+            self._toggle_overlay()
+
+    def _toggle_overlay(self) -> None:
+        if self._overlay_active:
+            flags = self._saved_window_flags if self._saved_window_flags else self.windowFlags()
+            self.setWindowFlags(flags)
+            self._overlay_active = False
+            self._append_log("hotkeys", "[INFO] Overlay disabled.")
+        else:
+            self._saved_window_flags = self.windowFlags()
+            # X11BypassWindowManagerHint is required for the window to appear
+            # above a fullscreen game — without it the compositor keeps the
+            # game on top.  The BulletImpactOverlay uses the same flag.
+            self.setWindowFlags(
+                self._saved_window_flags
+                | QtCore.Qt.WindowStaysOnTopHint
+                | QtCore.Qt.X11BypassWindowManagerHint
+            )
+            self._overlay_active = True
+            self._append_log("hotkeys", "[INFO] Overlay enabled (always-on-top).")
+        saved = self.geometry()
+        self.show()
+        self.setGeometry(saved)
+        if self._overlay_active:
+            self.raise_()
+            self.activateWindow()
 
     def _toggle_component_enabled(self, name: str) -> None:
         self._sync_current_profile_from_widgets()

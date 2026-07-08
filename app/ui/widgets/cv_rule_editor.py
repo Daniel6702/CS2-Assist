@@ -36,11 +36,13 @@ class CVRuleEditor(QtWidgets.QFrame):
         "allowed_weapons",
         "only_when_weapon",
         "auto_shoot",
+        "auto_shoot_aim_cooldown_ms",
         "spray_target_offset_enabled",
         "only_when_scoped_visual",
         "target_type",
         "AIM_MODE",
         "HEAD_OFFSET",
+        "BODY_KNEE_OFFSET",
         "SNAP_DISTANCE",
         "SETTLE_FRAMES",
         "CLICK_HOLD_MS",
@@ -172,6 +174,17 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.head_offset.valueChanged.connect(self._emit_change)
         aim_form.addRow("Head offset", self.head_offset)
 
+        self.body_knee_offset = QtWidgets.QDoubleSpinBox()
+        self.body_knee_offset.setRange(0.0, 1.0)
+        self.body_knee_offset.setDecimals(4)
+        self.body_knee_offset.setSingleStep(0.01)
+        self.body_knee_offset.setToolTip(
+            "Vertical fraction from top of bounding box to aim at in body mode.\n"
+            "0.50 = centre, 0.00 = top, 1.00 = bottom."
+        )
+        self.body_knee_offset.valueChanged.connect(self._emit_change)
+        aim_form.addRow("Body knee offset", self.body_knee_offset)
+
         self.snap_distance = QtWidgets.QSpinBox()
         self.snap_distance.setRange(0, 5000)
         self.snap_distance.valueChanged.connect(self._emit_change)
@@ -222,6 +235,16 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.cooldown_ms.setRange(0, 5000)
         self.cooldown_ms.valueChanged.connect(self._emit_change)
         timing_form.addRow("Cooldown ms", self.cooldown_ms)
+
+        self.auto_shoot_aim_cooldown_ms = QtWidgets.QSpinBox()
+        self.auto_shoot_aim_cooldown_ms.setRange(0, 5000)
+        self.auto_shoot_aim_cooldown_ms.setSuffix(" ms")
+        self.auto_shoot_aim_cooldown_ms.setToolTip(
+            "After an auto shot, disable aim assist (mouse movement) "
+            "for this rule for this many ms.  0 = disabled."
+        )
+        self.auto_shoot_aim_cooldown_ms.valueChanged.connect(self._emit_change)
+        timing_form.addRow("Aim assist cooldown", self.auto_shoot_aim_cooldown_ms)
 
         self.cross_x_thresh = QtWidgets.QSpinBox()
         self.cross_x_thresh.setRange(0, 2000)
@@ -285,10 +308,12 @@ class CVRuleEditor(QtWidgets.QFrame):
         weapons = self.allowed_weapons.text().strip()
         weapon_text = f" | weapons: {weapons}" if weapons else " | any weapon"
         shoot_text = " | auto shoot" if self.auto_shoot.isChecked() else " | aim only"
+        aim_cd = self.auto_shoot_aim_cooldown_ms.value()
+        aim_cd_text = f" | aim cd {aim_cd}ms" if aim_cd > 0 else ""
         type_text = f" | {self._target_type_value()}"
         scope_text = " | scoped only" if self.only_when_scoped_visual.isChecked() else ""
         spray_text = " | spray-align" if self.spray_target_offset_enabled.isChecked() else ""
-        self.summary.setText(f"{name} — {activation}{weapon_text}{type_text}{scope_text}{shoot_text}{spray_text}")
+        self.summary.setText(f"{name} — {activation}{weapon_text}{type_text}{scope_text}{shoot_text}{spray_text}{aim_cd_text}")
 
     def rule_name(self) -> str:
         return self.name_edit.text().strip()
@@ -325,10 +350,12 @@ class CVRuleEditor(QtWidgets.QFrame):
             self.spray_target_offset_enabled.setChecked(bool(data.get("spray_target_offset_enabled", False)))
             self.aim_mode.setCurrentText(str(data.get("AIM_MODE", "head")))
             self.head_offset.setValue(float(data.get("HEAD_OFFSET", 0.12)))
+            self.body_knee_offset.setValue(float(data.get("BODY_KNEE_OFFSET", 0.50)))
             self.snap_distance.setValue(int(data.get("SNAP_DISTANCE", 50)))
             self.settle_frames.setValue(int(data.get("SETTLE_FRAMES", 2)))
             self.click_hold_ms.setValue(int(data.get("CLICK_HOLD_MS", 15)))
             self.cooldown_ms.setValue(int(data.get("COOLDOWN_MS", 250)))
+            self.auto_shoot_aim_cooldown_ms.setValue(int(data.get("auto_shoot_aim_cooldown_ms", 0)))
             self.sens_coeff.setValue(float(data.get("SENS_COEFF", 1.0)))
             self.cross_x_thresh.setValue(int(data.get("CROSS_X_THRESH", 14)))
             self.cross_y_top.setValue(int(data.get("CROSS_Y_THRESH_TOP", 18)))
@@ -367,10 +394,12 @@ class CVRuleEditor(QtWidgets.QFrame):
         data.pop("spray_target_offset_scale", None)
         data["AIM_MODE"] = self.aim_mode.currentText()
         data["HEAD_OFFSET"] = self.head_offset.value()
+        data["BODY_KNEE_OFFSET"] = self.body_knee_offset.value()
         data["SNAP_DISTANCE"] = self.snap_distance.value()
         data["SETTLE_FRAMES"] = self.settle_frames.value()
         data["CLICK_HOLD_MS"] = self.click_hold_ms.value()
         data["COOLDOWN_MS"] = self.cooldown_ms.value()
+        data["auto_shoot_aim_cooldown_ms"] = self.auto_shoot_aim_cooldown_ms.value()
         data["SENS_COEFF"] = self.sens_coeff.value()
         data.pop("CONFIDENCE", None)
         data.pop("IMG_SIZE", None)

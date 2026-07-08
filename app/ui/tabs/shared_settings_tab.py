@@ -74,30 +74,51 @@ class SharedSettingsTab(BaseTab):
         layout.addWidget(gsi_group)
 
         hotkeys_group = QtWidgets.QGroupBox("Global Hotkeys")
-        hotkeys_layout = QtWidgets.QFormLayout(hotkeys_group)
-        hotkeys_layout.setLabelAlignment(QtCore.Qt.AlignTop)
-        hotkeys_layout.setHorizontalSpacing(12)
-        hotkeys_layout.setVerticalSpacing(6)
+        hotkeys_outer = QtWidgets.QVBoxLayout(hotkeys_group)
+        hotkeys_outer.setSpacing(6)
+
+        hotkeys_row = QtWidgets.QHBoxLayout()
+        hotkeys_row.setSpacing(24)
+
+        # Left column — existing hotkeys
+        left_form = QtWidgets.QFormLayout()
+        left_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        left_form.setHorizontalSpacing(12)
+        left_form.setVerticalSpacing(6)
 
         self.hotkey_cv_trigger = QtWidgets.QLineEdit()
-        hotkeys_layout.addRow("CV Aim Assist toggle", self.hotkey_cv_trigger)
+        left_form.addRow("CV Aim Assist toggle", self.hotkey_cv_trigger)
 
         self.hotkey_recoil = QtWidgets.QLineEdit()
-        hotkeys_layout.addRow("Recoil toggle", self.hotkey_recoil)
+        left_form.addRow("Recoil toggle", self.hotkey_recoil)
 
         self.hotkey_pixel_trigger = QtWidgets.QLineEdit()
-        hotkeys_layout.addRow("Pixel Trigger toggle", self.hotkey_pixel_trigger)
+        left_form.addRow("Pixel Trigger toggle", self.hotkey_pixel_trigger)
 
         self.hotkey_movement = QtWidgets.QLineEdit()
-        hotkeys_layout.addRow("Movement toggle", self.hotkey_movement)
+        left_form.addRow("Movement toggle", self.hotkey_movement)
 
         self.hotkey_stop_all = QtWidgets.QLineEdit()
-        hotkeys_layout.addRow("Stop All", self.hotkey_stop_all)
+        left_form.addRow("Stop All", self.hotkey_stop_all)
+
+        hotkeys_row.addLayout(left_form)
+
+        # Right column — overlay hotkey
+        right_form = QtWidgets.QFormLayout()
+        right_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        right_form.setHorizontalSpacing(12)
+        right_form.setVerticalSpacing(6)
+
+        self.hotkey_overlay = QtWidgets.QLineEdit()
+        right_form.addRow("Overlay toggle", self.hotkey_overlay)
 
         hotkey_note = QtWidgets.QLabel("Use values like F1, F2, Ctrl+F1, or Alt+Shift+M.")
         hotkey_note.setWordWrap(True)
         hotkey_note.setStyleSheet("color: #666;")
-        hotkeys_layout.addRow("", hotkey_note)
+        right_form.addRow("", hotkey_note)
+
+        hotkeys_row.addLayout(right_form)
+        hotkeys_outer.addLayout(hotkeys_row)
 
         layout.addWidget(hotkeys_group)
 
@@ -215,6 +236,7 @@ class SharedSettingsTab(BaseTab):
         self.hotkey_pixel_trigger.setText(str(hotkeys.get("pixel_trigger", "F3") or "F3"))
         self.hotkey_movement.setText(str(hotkeys.get("movement", "F4") or "F4"))
         self.hotkey_stop_all.setText(str(hotkeys.get("stop_all", "F5") or "F5"))
+        self.hotkey_overlay.setText(str(hotkeys.get("overlay", "Insert") or "Insert"))
 
         safety = config.get("safety", {})
         self.safety_enabled.setChecked(bool(safety.get("enabled", False)))
@@ -254,6 +276,7 @@ class SharedSettingsTab(BaseTab):
                 "pixel_trigger": self.hotkey_pixel_trigger.text().strip() or "F3",
                 "movement": self.hotkey_movement.text().strip() or "F4",
                 "stop_all": self.hotkey_stop_all.text().strip() or "F5",
+                "overlay": self.hotkey_overlay.text().strip() or "Insert",
             },
             "safety": {
                 "enabled": self.safety_enabled.isChecked(),

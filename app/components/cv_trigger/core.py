@@ -37,6 +37,44 @@ def _safe_stop_listener(listener: Any) -> None:
     except Exception:
         return
 
+
+def _aim_point_for_box(
+    *,
+    box: tuple[int, int, int, int],
+    crosshair: tuple[int, int],
+    aim_mode: str,
+    head_offset: float,
+    body_knee_offset: float,
+) -> tuple[int, int]:
+    x1, y1, x2, y2 = box
+    _, cy = crosshair
+    tx = (x1 + x2) >> 1
+    if aim_mode == "head":
+        return tx, int(y1 + head_offset * (y2 - y1))
+
+    knee = int(y1 + body_knee_offset * (y2 - y1))
+    provisional = min(max(cy, y1), y2)
+    return tx, provisional if provisional < knee else knee
+
+
+def _auto_shoot_zone_contains_crosshair(
+    *,
+    box: tuple[int, int, int, int],
+    crosshair: tuple[int, int],
+    cross_x: int,
+    cross_y_top: int,
+    cross_y_bot: int,
+) -> bool:
+    x1, y1, x2, y2 = box
+    cx, cy = crosshair
+    box_cx = (x1 + x2) >> 1
+    box_cy = (y1 + y2) >> 1
+    return box_cx - cross_x <= cx <= box_cx + cross_x and box_cy - cross_y_top <= cy <= box_cy + cross_y_bot
+
+
+def _shot_cooldown_active(*, now: float, cooldown_until: float) -> bool:
+    return now < cooldown_until
+
 class CVTriggerComponent(BaseComponent):
     name = "cv_trigger"
 
@@ -414,6 +452,7 @@ class CVTriggerComponent(BaseComponent):
 
         settle: dict[str, int] = {name: 0 for name in enabled_configs}
         cooldown_until: dict[str, float] = {name: 0.0 for name in enabled_configs}
+        aim_cooldown_until: dict[str, float] = {name: 0.0 for name in enabled_configs}
         filtered_error: dict[str, tuple[float, float] | None] = {name: None for name in enabled_configs}
         previous_active: tuple[str, ...] = ()
         status_every = 0.0
@@ -433,6 +472,7 @@ class CVTriggerComponent(BaseComponent):
                     for name in settle:
                         settle[name] = 0
                         filtered_error[name] = None
+                        aim_cooldown_until[name] = 0.0
                     x_predictor.reset_many(settle.keys())
                     previous_active = ()
                     self._set_overlay_state(False)
@@ -455,6 +495,7 @@ class CVTriggerComponent(BaseComponent):
                     if name not in active_name_set:
                         settle[name] = 0
                         filtered_error[name] = None
+                        aim_cooldown_until[name] = 0.0
                         x_predictor.reset(name)
 
                 if tuple(active_names) != previous_active:
@@ -509,8 +550,6 @@ class CVTriggerComponent(BaseComponent):
                 for name in active_names:
                     cfg = enabled_configs[name]
                     now = time.time()
-                    if now < cooldown_until[name]:
-                        continue
 
                     target_classes = self._resolve_rule_target_classes(cfg, global_target_sides)
                     if not target_classes:
@@ -524,6 +563,9 @@ class CVTriggerComponent(BaseComponent):
                     aim_mode = str(cfg["AIM_MODE"]).lower()
                     snap_r2 = int(cfg["SNAP_DISTANCE"]) ** 2
                     auto_shoot = _truthy(cfg.get("auto_shoot", True))
+                    cross_x = int(cfg["CROSS_X_THRESH"])
+                    cross_y_top = int(cfg["CROSS_Y_THRESH_TOP"])
+                    cross_y_bot = int(cfg["CROSS_Y_THRESH_BOT"])
 
                     left_button_held = activation.button_held("left")
                     spray_offset_x, spray_offset_y = self._spray_target_offset_for_rule(
@@ -537,19 +579,21 @@ class CVTriggerComponent(BaseComponent):
                         self._set_overlay_state(True, spray_offset_x, spray_offset_y, name)
                         overlay_set = True
 
-                    best = None
+                    best_movement = None
+                    best_click = None
                     for box, cls in zip(boxes_xyxy, boxes_cls):
                         if int(cls) not in target_classes:
                             continue
 
                         x1, y1, x2, y2 = map(int, box[:4])
-                        tx = (x1 + x2) >> 1
-                        if aim_mode == "head":
-                            ty = int(y1 + float(cfg["HEAD_OFFSET"]) * (y2 - y1))
-                        else:
-                            knee = int(y1 + 0.50 * (y2 - y1))
-                            provisional = min(max(cy, y1), y2)
-                            ty = provisional if provisional < knee else knee
+                        box_tuple = (x1, y1, x2, y2)
+                        tx, ty = _aim_point_for_box(
+                            box=box_tuple,
+                            crosshair=(cx, cy),
+                            aim_mode=aim_mode,
+                            head_offset=float(cfg["HEAD_OFFSET"]),
+                            body_knee_offset=float(cfg.get("BODY_KNEE_OFFSET", 0.50)),
+                        )
 
                         pred_bullet_cx = cx - spray_offset_x
                         pred_bullet_cy = cy - spray_offset_y
@@ -576,105 +620,121 @@ class CVTriggerComponent(BaseComponent):
                         ):
                             err_y = 0.0
 
-                        d2 = err_x * err_x + err_y * err_y
-                        if d2 <= snap_r2 and (best is None or d2 < best["d2"]):
-                            best = {
+                        aim_d2 = (tx - cx) * (tx - cx) + (ty - cy) * (ty - cy)
+                        if aim_d2 <= snap_r2 and (best_movement is None or aim_d2 < best_movement["d2"]):
+                            best_movement = {
                                 "raw_err_x": float(err_x),
                                 "raw_err_y": float(err_y),
-                                "d2": float(d2),
+                                "d2": float(aim_d2),
                                 "target_tx": float(tx),
                                 "target_ty": float(ty),
                                 "pred_bullet_cx": float(pred_bullet_cx),
                                 "pred_bullet_cy": float(pred_bullet_cy),
                             }
 
-                    if not best:
+                        if _auto_shoot_zone_contains_crosshair(
+                            box=box_tuple,
+                            crosshair=(cx, cy),
+                            cross_x=cross_x,
+                            cross_y_top=cross_y_top,
+                            cross_y_bot=cross_y_bot,
+                        ):
+                            box_cx = (x1 + x2) >> 1
+                            box_cy = (y1 + y2) >> 1
+                            center_d2 = (box_cx - cx) * (box_cx - cx) + (box_cy - cy) * (box_cy - cy)
+                            if best_click is None or center_d2 < best_click["d2"]:
+                                best_click = {
+                                    "d2": float(center_d2),
+                                }
+
+                    if best_movement is None and best_click is None:
                         settle[name] = 0
                         filtered_error[name] = None
                         x_predictor.reset(name)
                         continue
 
-                    target_tx = x_predictor.predict(
-                        name,
-                        float(best["target_tx"]),
-                        time.perf_counter(),
-                        enabled=x_prediction_enabled,
-                        history_ms=session_history_ms,
-                        min_samples=x_prediction_min_samples,
-                        lead_ms=session_lead_ms,
-                        damping=session_damping,
-                        max_delta_px=x_prediction_max_delta_px,
-                        reset_distance_px=x_prediction_reset_px,
-                    )
-                    target_ty = float(best["target_ty"])
-                    pred_bullet_cx = float(best["pred_bullet_cx"])
-                    pred_bullet_cy = float(best["pred_bullet_cy"])
+                    if best_movement is not None:
+                        target_tx = x_predictor.predict(
+                            name,
+                            float(best_movement["target_tx"]),
+                            time.perf_counter(),
+                            enabled=x_prediction_enabled,
+                            history_ms=session_history_ms,
+                            min_samples=x_prediction_min_samples,
+                            lead_ms=session_lead_ms,
+                            damping=session_damping,
+                            max_delta_px=x_prediction_max_delta_px,
+                            reset_distance_px=x_prediction_reset_px,
+                        )
+                        target_ty = float(best_movement["target_ty"])
+                        pred_bullet_cx = float(best_movement["pred_bullet_cx"])
+                        pred_bullet_cy = float(best_movement["pred_bullet_cy"])
 
-                    target_dx_from_center = target_tx - cx
-                    target_dy_from_center = target_ty - cy
-                    pred_dx_from_center = pred_bullet_cx - cx
-                    pred_dy_from_center = pred_bullet_cy - cy
+                        target_dx_from_center = target_tx - cx
+                        target_dy_from_center = target_ty - cy
+                        pred_dx_from_center = pred_bullet_cx - cx
+                        pred_dy_from_center = pred_bullet_cy - cy
 
-                    raw_dx = float(target_tx - pred_bullet_cx)
-                    raw_dy = float(target_ty - pred_bullet_cy)
+                        raw_dx = float(target_tx - pred_bullet_cx)
+                        raw_dy = float(target_ty - pred_bullet_cy)
 
-                    if (
-                        pred_dx_from_center != 0
-                        and target_dx_from_center * pred_dx_from_center > 0
-                        and abs(target_dx_from_center) <= abs(pred_dx_from_center)
-                    ):
-                        raw_dx = 0.0
+                        if (
+                            pred_dx_from_center != 0
+                            and target_dx_from_center * pred_dx_from_center > 0
+                            and abs(target_dx_from_center) <= abs(pred_dx_from_center)
+                        ):
+                            raw_dx = 0.0
 
-                    if (
-                        pred_dy_from_center != 0
-                        and target_dy_from_center * pred_dy_from_center > 0
-                        and abs(target_dy_from_center) <= abs(pred_dy_from_center)
-                    ):
-                        raw_dy = 0.0
+                        if (
+                            pred_dy_from_center != 0
+                            and target_dy_from_center * pred_dy_from_center > 0
+                            and abs(target_dy_from_center) <= abs(pred_dy_from_center)
+                        ):
+                            raw_dy = 0.0
 
-                    dist = (raw_dx * raw_dx + raw_dy * raw_dy) ** 0.5
-                    prev = filtered_error.get(name)
-                    if prev is None or dist >= near_smoothing_radius_px:
-                        filt_dx = raw_dx
-                        filt_dy = raw_dy
+                        dist = (raw_dx * raw_dx + raw_dy * raw_dy) ** 0.5
+                        prev = filtered_error.get(name)
+                        if prev is None or dist >= near_smoothing_radius_px:
+                            filt_dx = raw_dx
+                            filt_dy = raw_dy
+                        else:
+                            adaptive_alpha = max(near_smoothing_alpha, min(1.0, dist / max(1.0, near_smoothing_radius_px)))
+                            filt_dx = prev[0] + adaptive_alpha * (raw_dx - prev[0])
+                            filt_dy = prev[1] + adaptive_alpha * (raw_dy - prev[1])
+
+                        if abs(filt_dx) <= jitter_deadzone_px:
+                            filt_dx = 0.0
+                        if abs(filt_dy) <= jitter_deadzone_px:
+                            filt_dy = 0.0
+
+                        filtered_error[name] = (filt_dx, filt_dy)
+                        if now >= aim_cooldown_until.get(name, 0.0):
+                            dx = int(round(filt_dx))
+                            dy = int(round(filt_dy))
+                            movement_candidates.append({
+                                "name": name,
+                                "cfg": cfg,
+                                "sens_mult_x": sens_mult_x,
+                                "sens_mult_y": sens_mult_y,
+                                "dx": dx,
+                                "dy": dy,
+                                "d2": best_movement["d2"],
+                                "now": now,
+                            })
                     else:
-                        adaptive_alpha = max(near_smoothing_alpha, min(1.0, dist / max(1.0, near_smoothing_radius_px)))
-                        filt_dx = prev[0] + adaptive_alpha * (raw_dx - prev[0])
-                        filt_dy = prev[1] + adaptive_alpha * (raw_dy - prev[1])
+                        filtered_error[name] = None
+                        x_predictor.reset(name)
 
-                    if abs(filt_dx) <= jitter_deadzone_px:
-                        filt_dx = 0.0
-                    if abs(filt_dy) <= jitter_deadzone_px:
-                        filt_dy = 0.0
-
-                    filtered_error[name] = (filt_dx, filt_dy)
-                    dx = int(round(filt_dx))
-                    dy = int(round(filt_dy))
-
-                    in_box = (
-                        abs(dx) < int(cfg["CROSS_X_THRESH"])
-                        and -int(cfg["CROSS_Y_THRESH_TOP"]) <= dy <= int(cfg["CROSS_Y_THRESH_BOT"])
-                    )
-
-                    candidate = {
-                        "name": name,
-                        "cfg": cfg,
-                        "sens_mult_x": sens_mult_x,
-                        "sens_mult_y": sens_mult_y,
-                        "dx": dx,
-                        "dy": dy,
-                        "d2": float(dx * dx + dy * dy),
-                        "in_box": in_box,
-                        "auto_shoot": auto_shoot,
-                        "now": now,
-                    }
-                    movement_candidates.append(candidate)
-
-                    if in_box:
+                    if best_click is not None:
                         threshold = max(1, int(cfg["SETTLE_FRAMES"]))
                         settle[name] = min(threshold, settle[name] + 1)
-                        if settle[name] >= threshold and auto_shoot:
-                            click_ready.append(candidate)
+                        if settle[name] >= threshold and auto_shoot and not _shot_cooldown_active(now=now, cooldown_until=cooldown_until[name]):
+                            click_ready.append({
+                                "name": name,
+                                "cfg": cfg,
+                                "d2": best_click["d2"],
+                                "now": now,
+                            })
                         elif settle[name] >= threshold:
                             settle[name] = threshold
                     else:
@@ -683,11 +743,12 @@ class CVTriggerComponent(BaseComponent):
                 if not overlay_set:
                     self._set_overlay_state(False)
 
-                if not movement_candidates:
+                if not movement_candidates and not click_ready:
                     continue
 
-                best_movement = min(movement_candidates, key=lambda item: item["d2"])
-                smooth_snap(int(best_movement["dx"]), int(best_movement["dy"]), float(best_movement["sens_mult_x"]), float(best_movement["sens_mult_y"]))
+                if movement_candidates:
+                    best_movement = min(movement_candidates, key=lambda item: item["d2"])
+                    smooth_snap(int(best_movement["dx"]), int(best_movement["dy"]), float(best_movement["sens_mult_x"]), float(best_movement["sens_mult_y"]))
 
                 if click_ready:
                     best_click = min(click_ready, key=lambda item: item["d2"])
@@ -700,6 +761,9 @@ class CVTriggerComponent(BaseComponent):
                         base_cooldown = float(triggered_cfg["COOLDOWN_MS"]) / 1000.0
                         cooldown_until[triggered_name] = best_click["now"] + humanize_jitter(base_cooldown, fraction=_cooldown_frac if _enabled else 0.0, min_val=0.01)
                         settle[triggered_name] = 0
+                        aim_cd_ms = float(triggered_cfg.get("auto_shoot_aim_cooldown_ms", 0))
+                        if aim_cd_ms > 0:
+                            aim_cooldown_until[triggered_name] = best_click["now"] + aim_cd_ms / 1000.0
 
         except Exception as exc:
             self.status(str(exc), "error")
