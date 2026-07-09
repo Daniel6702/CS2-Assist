@@ -195,10 +195,19 @@ class MainWindow(QtWidgets.QMainWindow):
             self.bullet_overlay.hide_overlay()
             return
         settings = self._bullet_overlay_settings()
-        self.bullet_overlay.configure(settings["diameter_px"], settings["opacity"])
         if not settings["enabled"]:
             self.bullet_overlay.hide_overlay()
             return
+        geom = self._bullet_overlay_geometry()
+        if geom is None:
+            self.bullet_overlay.hide_overlay()
+            return
+        left, top, mon_width, mon_height = geom
+        self.bullet_overlay.configure(
+            settings["diameter_px"],
+            settings["opacity"],
+            monitor_geometry=(int(left), int(top), int(mon_width), int(mon_height)),
+        )
         recoil = self.runtime.components.get("recoil")
         if recoil is None or not hasattr(recoil, "get_alignment_state"):
             self.bullet_overlay.hide_overlay()
@@ -211,11 +220,6 @@ class MainWindow(QtWidgets.QMainWindow):
         if not isinstance(state, dict) or not bool(state.get("active", False)):
             self.bullet_overlay.hide_overlay()
             return
-        geom = self._bullet_overlay_geometry()
-        if geom is None:
-            self.bullet_overlay.hide_overlay()
-            return
-        left, top, mon_width, mon_height = geom
         try:
             mouse_x = float(state.get("mouse_offset_x", 0.0) or 0.0)
             mouse_y = float(state.get("mouse_offset_y", 0.0) or 0.0)

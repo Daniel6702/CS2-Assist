@@ -42,11 +42,11 @@
     },
     "components": {
         "bhop": {
-            "enabled": true,
+            "enabled": false,
             "tap_interval_ms": 20
         },
         "snap_tap": {
-            "enabled": true
+            "enabled": false
         },
         "counter_strafe": {
             "enabled": false,
@@ -71,7 +71,7 @@
             "auto_select_from_gsi": true,
             "axis_strength_percent": {
                 "x": 100.0,
-                "y": 95.0
+                "y": 100.0
             },
             "sensitivity": {
                 "apply_to_axis": {
@@ -155,33 +155,26 @@
             "y": null
         },
         "cv_trigger": {
-            "enabled": true,
-            "model_path": "/home/Daniel6702/Applications/cs2/CS2-Assist/CS2-Assist/resources/best.pt",
-            "monitor": {
-                "top": 0,
-                "left": 0,
-                "width": 2560,
-                "height": 1440
-            },
-            "game_resolution": {
-                "width": 1600,
-                "height": 1200
-            },
-            "use_gsi_opponent_side": false,
-            "manual_target_side": "both",
-            "inference_confidence": 0.2,
-            "inference_img_size": 384,
-            "jitter_deadzone_px": 2.0,
-            "near_smoothing_alpha": 0.35,
-            "near_smoothing_radius_px": 32.0,
-            "x_prediction_enabled": true,
-            "x_prediction_lead_ms": 120.0,
-            "x_prediction_history_ms": 120.0,
-            "x_prediction_damping": 0.7,
-            "x_prediction_max_delta_px": 200.0,
             "configs": {
                 "rifle_always": {
-                    "enabled": true,
+                    "ACCEL_BOOST": 1.0,
+                    "AIM_MODE": "head",
+                    "AIM_STRENGTH": 100.0,
+                    "ANTI_OVERSHOOT": true,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "CLICK_HOLD_MS": 20,
+                    "CONSTANT_SPEED_PX": 50,
+                    "COOLDOWN_MS": 350,
+                    "CROSS_X_THRESH": 30,
+                    "CROSS_Y_THRESH_BOT": 35,
+                    "CROSS_Y_THRESH_TOP": 20,
+                    "CURVE_INTENSITY": 1.0,
+                    "HEAD_OFFSET": 0.14,
+                    "NOISE_AMOUNT": 0.0,
+                    "RESPONSE_CURVE": "accelerating",
+                    "SETTLE_FRAMES": 2,
+                    "SMOOTHING_ALPHA": 0.5,
+                    "SNAP_DISTANCE": 120,
                     "activation": {
                         "mode": "always"
                     },
@@ -194,28 +187,35 @@
                         "weapon_aug",
                         "weapon_sg556"
                     ],
-                    "target_type": "both",
-                    "only_when_scoped_visual": false,
                     "auto_shoot": false,
-                    "spray_target_offset_enabled": true,
-                    "AIM_MODE": "head",
-                    "HEAD_OFFSET": 0.16,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "SNAP_DISTANCE": 35,
-                    "SETTLE_FRAMES": 2,
-                    "CLICK_HOLD_MS": 20,
-                    "COOLDOWN_MS": 350,
                     "auto_shoot_aim_cooldown_ms": 0,
-                    "SENS_COEFF": 1.2,
-                    "CROSS_X_THRESH": 30,
-                    "CROSS_Y_THRESH_TOP": 20,
-                    "CROSS_Y_THRESH_BOT": 35
+                    "enabled": true,
+                    "only_when_scoped_visual": false,
+                    "spray_target_offset_enabled": true,
+                    "target_type": "both"
                 },
                 "rifle_shoot": {
-                    "enabled": true,
+                    "ACCEL_BOOST": 1.0,
+                    "AIM_MODE": "head",
+                    "AIM_STRENGTH": 90.0,
+                    "ANTI_OVERSHOOT": true,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "CLICK_HOLD_MS": 15,
+                    "CONSTANT_SPEED_PX": 60,
+                    "COOLDOWN_MS": 250,
+                    "CROSS_X_THRESH": 14,
+                    "CROSS_Y_THRESH_BOT": 32,
+                    "CROSS_Y_THRESH_TOP": 18,
+                    "CURVE_INTENSITY": 0.8,
+                    "HEAD_OFFSET": 0.18,
+                    "NOISE_AMOUNT": 0.0,
+                    "RESPONSE_CURVE": "proportional",
+                    "SETTLE_FRAMES": 2,
+                    "SMOOTHING_ALPHA": 0.0,
+                    "SNAP_DISTANCE": 60,
                     "activation": {
-                        "device": "mouse",
-                        "button": "left"
+                        "button": "left",
+                        "device": "mouse"
                     },
                     "allowed_weapons": [
                         "weapon_ak47",
@@ -226,97 +226,132 @@
                         "weapon_aug",
                         "weapon_sg556"
                     ],
-                    "target_type": "both",
-                    "only_when_scoped_visual": false,
                     "auto_shoot": false,
-                    "spray_target_offset_enabled": true,
-                    "AIM_MODE": "head",
-                    "HEAD_OFFSET": 0.18,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "SNAP_DISTANCE": 60,
-                    "SETTLE_FRAMES": 2,
-                    "CLICK_HOLD_MS": 15,
-                    "COOLDOWN_MS": 250,
                     "auto_shoot_aim_cooldown_ms": 0,
-                    "SENS_COEFF": 1.8,
-                    "CROSS_X_THRESH": 14,
-                    "CROSS_Y_THRESH_TOP": 18,
-                    "CROSS_Y_THRESH_BOT": 32
+                    "enabled": false,
+                    "only_when_scoped_visual": false,
+                    "spray_target_offset_enabled": true,
+                    "target_type": "both"
                 },
                 "trigger": {
-                    "enabled": false,
+                    "ACCEL_BOOST": 1.0,
+                    "AIM_MODE": "head",
+                    "AIM_STRENGTH": 0.0,
+                    "ANTI_OVERSHOOT": true,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "CLICK_HOLD_MS": 1,
+                    "CONSTANT_SPEED_PX": 50,
+                    "COOLDOWN_MS": 300,
+                    "CROSS_X_THRESH": 25,
+                    "CROSS_Y_THRESH_BOT": 40,
+                    "CROSS_Y_THRESH_TOP": 40,
+                    "CURVE_INTENSITY": 1.0,
+                    "HEAD_OFFSET": 0.12,
+                    "NOISE_AMOUNT": 0.0,
+                    "RESPONSE_CURVE": "proportional",
+                    "SETTLE_FRAMES": 0,
+                    "SMOOTHING_ALPHA": 0.0,
+                    "SNAP_DISTANCE": 18,
                     "activation": {
                         "device": "keyboard",
                         "key": "alt"
                     },
-                    "target_type": "both",
-                    "only_when_scoped_visual": false,
                     "auto_shoot": true,
-                    "spray_target_offset_enabled": false,
-                    "AIM_MODE": "head",
-                    "HEAD_OFFSET": 0.12,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "SNAP_DISTANCE": 18,
-                    "SETTLE_FRAMES": 0,
-                    "CLICK_HOLD_MS": 1,
-                    "COOLDOWN_MS": 300,
                     "auto_shoot_aim_cooldown_ms": 0,
-                    "SENS_COEFF": 0.0,
-                    "CROSS_X_THRESH": 25,
-                    "CROSS_Y_THRESH_TOP": 40,
-                    "CROSS_Y_THRESH_BOT": 40
+                    "enabled": false,
+                    "only_when_scoped_visual": false,
+                    "spray_target_offset_enabled": false,
+                    "target_type": "both"
                 },
                 "usp1": {
-                    "enabled": false,
+                    "ACCEL_BOOST": 1.0,
+                    "AIM_MODE": "head",
+                    "AIM_STRENGTH": 60.0,
+                    "ANTI_OVERSHOOT": true,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "CLICK_HOLD_MS": 15,
+                    "CONSTANT_SPEED_PX": 50,
+                    "COOLDOWN_MS": 350,
+                    "CROSS_X_THRESH": 12,
+                    "CROSS_Y_THRESH_BOT": 32,
+                    "CROSS_Y_THRESH_TOP": 18,
+                    "CURVE_INTENSITY": 1.0,
+                    "HEAD_OFFSET": 0.1,
+                    "NOISE_AMOUNT": 0.0,
+                    "RESPONSE_CURVE": "proportional",
+                    "SETTLE_FRAMES": 1,
+                    "SMOOTHING_ALPHA": 0.0,
+                    "SNAP_DISTANCE": 50,
                     "activation": {
                         "mode": "always"
                     },
                     "allowed_weapons": [
                         "weapon_usp_silencer"
                     ],
-                    "target_type": "both",
-                    "only_when_scoped_visual": false,
                     "auto_shoot": false,
-                    "spray_target_offset_enabled": false,
-                    "AIM_MODE": "head",
-                    "HEAD_OFFSET": 0.1,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "SNAP_DISTANCE": 50,
-                    "SETTLE_FRAMES": 1,
-                    "CLICK_HOLD_MS": 15,
-                    "COOLDOWN_MS": 350,
                     "auto_shoot_aim_cooldown_ms": 0,
-                    "SENS_COEFF": 1.2,
-                    "CROSS_X_THRESH": 12,
-                    "CROSS_Y_THRESH_TOP": 18,
-                    "CROSS_Y_THRESH_BOT": 32
+                    "enabled": false,
+                    "only_when_scoped_visual": false,
+                    "spray_target_offset_enabled": false,
+                    "target_type": "both"
                 },
                 "usp2": {
-                    "enabled": false,
+                    "ACCEL_BOOST": 1.0,
+                    "AIM_MODE": "head",
+                    "AIM_STRENGTH": 40.0,
+                    "ANTI_OVERSHOOT": true,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "CLICK_HOLD_MS": 15,
+                    "CONSTANT_SPEED_PX": 40,
+                    "COOLDOWN_MS": 350,
+                    "CROSS_X_THRESH": 4,
+                    "CROSS_Y_THRESH_BOT": 32,
+                    "CROSS_Y_THRESH_TOP": 18,
+                    "CURVE_INTENSITY": 1.2,
+                    "HEAD_OFFSET": 0.1,
+                    "NOISE_AMOUNT": 0.0,
+                    "RESPONSE_CURVE": "proportional",
+                    "SETTLE_FRAMES": 2,
+                    "SMOOTHING_ALPHA": 0.0,
+                    "SNAP_DISTANCE": 40,
                     "activation": {
                         "mode": "always"
                     },
                     "allowed_weapons": [
                         "weapon_usp_silencer"
                     ],
-                    "target_type": "both",
-                    "only_when_scoped_visual": false,
                     "auto_shoot": false,
-                    "spray_target_offset_enabled": false,
-                    "AIM_MODE": "head",
-                    "HEAD_OFFSET": 0.1,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "SNAP_DISTANCE": 40,
-                    "SETTLE_FRAMES": 2,
-                    "CLICK_HOLD_MS": 15,
-                    "COOLDOWN_MS": 350,
                     "auto_shoot_aim_cooldown_ms": 0,
-                    "SENS_COEFF": 0.8,
-                    "CROSS_X_THRESH": 4,
-                    "CROSS_Y_THRESH_TOP": 18,
-                    "CROSS_Y_THRESH_BOT": 32
+                    "enabled": false,
+                    "only_when_scoped_visual": false,
+                    "spray_target_offset_enabled": false,
+                    "target_type": "both"
                 }
-            }
+            },
+            "enabled": true,
+            "game_resolution": {
+                "height": 1200,
+                "width": 1600
+            },
+            "inference_confidence": 0.15,
+            "inference_img_size": 512,
+            "jitter_deadzone_px": 2.0,
+            "manual_target_side": "both",
+            "model_path": "/home/Daniel6702/Applications/cs2/CS2-Assist/CS2-Assist/resources/best.pt",
+            "monitor": {
+                "height": 1440,
+                "left": 0,
+                "top": 0,
+                "width": 2560
+            },
+            "near_smoothing_alpha": 0.35,
+            "near_smoothing_radius_px": 32.0,
+            "use_gsi_opponent_side": false,
+            "x_prediction_damping": 0.7,
+            "x_prediction_enabled": true,
+            "x_prediction_history_ms": 120.0,
+            "x_prediction_lead_ms": 120.0,
+            "x_prediction_max_delta_px": 200.0
         }
     }
 }

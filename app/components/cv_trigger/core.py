@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+import random
 import threading
 import time
 from pathlib import Path
@@ -394,33 +396,118 @@ class CVTriggerComponent(BaseComponent):
         cx = mon_width // 2
         cy = mon_height // 2
 
-        def scaled(v: float, factor: float) -> int:
-            out = int(v * factor)
-            if out == 0 and v != 0:
-                out = 1 if v > 0 else -1
-            return out
+        # ── Configurable aim assist engine ──────────────────────────────────
 
-        def smooth_snap(dx: int, dy: int, sens_mult_x: float, sens_mult_y: float) -> None:
-            dist2 = dx * dx + dy * dy
-            if dist2 == 0:
-                return
-            dist = dist2 ** 0.5
-            if dist > 250:
-                frac = 0.80
-            elif dist > 120:
-                frac = 0.60
-            elif dist > 60:
-                frac = 0.40
-            elif dist > 20:
-                frac = 0.25
+        def _response_fraction(
+            *,
+            dist: float,
+            snap_distance: int,
+            curve: str,
+            curve_intensity: float,
+            constant_speed_px: int,
+            accel_boost: float,
+        ) -> float:
+            """Return a fraction (0–1) of the remaining error to move this frame."""
+            if dist <= 0.0 or snap_distance <= 0:
+                return 0.0
+            nd = min(dist / float(snap_distance), 1.0)  # normalised distance
+
+            if curve == "proportional":
+                # Fraction proportional to remaining distance.
+                # curve_intensity < 1 → more aggressive up close (finer control far away)
+                # curve_intensity > 1 → more aggressive at distance (finer close-up)
+                return nd ** max(curve_intensity, 0.1)
+
+            if curve == "constant":
+                # Fixed pixel speed toward target regardless of distance (capped at 1).
+                return min(max(constant_speed_px, 1) / max(dist, 1.0), 1.0)
+
+            if curve == "accelerating":
+                # Speed *increases* as target gets closer (inverse of proportional).
+                # accel_boost (0.5–5.0): higher = more dramatic speed-up near target.
+                return (1.0 - nd) ** max(accel_boost, 0.1)
+
+            if curve == "exponential":
+                # Smooth exponential approach — starts fast, decelerates smoothly.
+                # curve_intensity controls how aggressive the pull is.
+                return 1.0 - math.exp(-curve_intensity * nd)
+
+            return nd  # fallback linear
+
+        per_rule_smooth: dict[str, tuple[float, float] | None] = {}
+
+        def aim_assist_move(
+            *,
+            error_px: tuple[float, float],
+            aim_strength: float,
+            snap_distance: int,
+            curve: str,
+            curve_intensity: float,
+            constant_speed_px: int,
+            accel_boost: float,
+            overshoot_guard: bool,
+            smoothing_alpha: float,
+            noise_px: float,
+            sens_mult_x: float,
+            sens_mult_y: float,
+            rule_name: str,
+        ) -> tuple[int, int]:
+            """Compute (mouse_dx, mouse_dy) from pixel-space error.
+
+            Guarantees NO overshoot when *overshoot_guard* is ON (default):
+            the emitted mouse movement never exceeds the remaining pixel error
+            on either axis, so the crosshair can never cross the target.
+            """
+            ex, ey = error_px
+            dist = (ex * ex + ey * ey) ** 0.5
+            if dist < 0.5 or dist > snap_distance:
+                per_rule_smooth.pop(rule_name, None)
+                return 0, 0
+
+            # ── per-rule smoothing (exponential filter on the pixel error) ──
+            prev = per_rule_smooth.get(rule_name)
+            if smoothing_alpha > 0.0 and prev is not None:
+                sx = prev[0] + smoothing_alpha * (ex - prev[0])
+                sy = prev[1] + smoothing_alpha * (ey - prev[1])
             else:
-                frac = 0.15
-            mdx = scaled(dx * sens_mult_x, frac)
-            mdy = scaled(dy * sens_mult_y, frac)
-            if _eased and (abs(mdx) > 15 or abs(mdy) > 15):
-                vmouse.eased_emit_rel(mdx, mdy)
-            else:
-                vmouse.emit_rel(mdx, mdy)
+                sx, sy = ex, ey
+            per_rule_smooth[rule_name] = (sx, sy)
+
+            # ── response curve fraction ──
+            frac = _response_fraction(
+                dist=dist,
+                snap_distance=snap_distance,
+                curve=curve,
+                curve_intensity=curve_intensity,
+                constant_speed_px=constant_speed_px,
+                accel_boost=accel_boost,
+            )
+
+            # strength 0–100 → 0–1
+            strength = max(0.0, min(aim_strength, 100.0)) / 100.0
+
+            # mouse-space movement
+            mdx = round(sx * strength * frac * sens_mult_x)
+            mdy = round(sy * strength * frac * sens_mult_y)
+
+            # ── anti-overshoot clamp ───────────────────────────────────────
+            if overshoot_guard:
+                max_dx = abs(round(ex * sens_mult_x))
+                max_dy = abs(round(ey * sens_mult_y))
+                mdx = max(-max_dx, min(mdx, max_dx))
+                mdy = max(-max_dy, min(mdy, max_dy))
+
+            # ── optional noise for natural feel ────────────────────────────
+            if noise_px > 0.0 and (mdx != 0 or mdy != 0):
+                nx = round(random.uniform(-noise_px, noise_px))
+                ny = round(random.uniform(-noise_px, noise_px))
+                if overshoot_guard:
+                    nx = max(-max_dx - abs(mdx), min(nx, max_dx - abs(mdx)))
+                    ny = max(-max_dy - abs(mdy), min(ny, max_dy - abs(mdy)))
+                mdx += nx
+                mdy += ny
+
+            return mdx, mdy
 
         activation = ActivationState()
 
@@ -473,6 +560,7 @@ class CVTriggerComponent(BaseComponent):
                         settle[name] = 0
                         filtered_error[name] = None
                         aim_cooldown_until[name] = 0.0
+                        per_rule_smooth.pop(name, None)
                     x_predictor.reset_many(settle.keys())
                     previous_active = ()
                     self._set_overlay_state(False)
@@ -496,6 +584,7 @@ class CVTriggerComponent(BaseComponent):
                         settle[name] = 0
                         filtered_error[name] = None
                         aim_cooldown_until[name] = 0.0
+                        per_rule_smooth.pop(name, None)
                         x_predictor.reset(name)
 
                 if tuple(active_names) != previous_active:
@@ -558,10 +647,20 @@ class CVTriggerComponent(BaseComponent):
                         x_predictor.reset(name)
                         continue
 
-                    sens_mult_x = round(float(cfg["SENS_COEFF"]) * base_sens_mult_x, 4)
-                    sens_mult_y = round(float(cfg["SENS_COEFF"]) * base_sens_mult_y, 4)
+                    aim_strength = float(cfg.get("AIM_STRENGTH", cfg.get("SENS_COEFF", 50.0)))
+                    sens_mult_x = round(base_sens_mult_x, 4)
+                    sens_mult_y = round(base_sens_mult_y, 4)
+                    snap_distance = int(cfg.get("SNAP_DISTANCE", 200))
+                    aim_curve = str(cfg.get("RESPONSE_CURVE", "proportional"))
+                    curve_intensity = float(cfg.get("CURVE_INTENSITY", 1.0))
+                    constant_speed_px = int(cfg.get("CONSTANT_SPEED_PX", 50))
+                    accel_boost = float(cfg.get("ACCEL_BOOST", 1.0))
+                    overshoot_guard = _truthy(cfg.get("ANTI_OVERSHOOT", True))
+                    aim_smoothing_alpha = float(cfg.get("SMOOTHING_ALPHA", 0.0))
+                    noise_amount = float(cfg.get("NOISE_AMOUNT", 0.0))
+
                     aim_mode = str(cfg["AIM_MODE"]).lower()
-                    snap_r2 = int(cfg["SNAP_DISTANCE"]) ** 2
+                    snap_r2 = snap_distance * snap_distance
                     auto_shoot = _truthy(cfg.get("auto_shoot", True))
                     cross_x = int(cfg["CROSS_X_THRESH"])
                     cross_y_top = int(cfg["CROSS_Y_THRESH_TOP"])
@@ -650,6 +749,7 @@ class CVTriggerComponent(BaseComponent):
                     if best_movement is None and best_click is None:
                         settle[name] = 0
                         filtered_error[name] = None
+                        per_rule_smooth.pop(name, None)
                         x_predictor.reset(name)
                         continue
 
@@ -709,20 +809,28 @@ class CVTriggerComponent(BaseComponent):
 
                         filtered_error[name] = (filt_dx, filt_dy)
                         if now >= aim_cooldown_until.get(name, 0.0):
-                            dx = int(round(filt_dx))
-                            dy = int(round(filt_dy))
                             movement_candidates.append({
                                 "name": name,
                                 "cfg": cfg,
                                 "sens_mult_x": sens_mult_x,
                                 "sens_mult_y": sens_mult_y,
-                                "dx": dx,
-                                "dy": dy,
+                                "dx": float(filt_dx),
+                                "dy": float(filt_dy),
                                 "d2": best_movement["d2"],
                                 "now": now,
+                                "aim_strength": aim_strength,
+                                "snap_distance": snap_distance,
+                                "aim_curve": aim_curve,
+                                "curve_intensity": curve_intensity,
+                                "constant_speed_px": constant_speed_px,
+                                "accel_boost": accel_boost,
+                                "overshoot_guard": overshoot_guard,
+                                "aim_smoothing_alpha": aim_smoothing_alpha,
+                                "noise_amount": noise_amount,
                             })
                     else:
                         filtered_error[name] = None
+                        per_rule_smooth.pop(name, None)
                         x_predictor.reset(name)
 
                     if best_click is not None:
@@ -747,8 +855,27 @@ class CVTriggerComponent(BaseComponent):
                     continue
 
                 if movement_candidates:
-                    best_movement = min(movement_candidates, key=lambda item: item["d2"])
-                    smooth_snap(int(best_movement["dx"]), int(best_movement["dy"]), float(best_movement["sens_mult_x"]), float(best_movement["sens_mult_y"]))
+                    m = min(movement_candidates, key=lambda item: item["d2"])
+                    mdx, mdy = aim_assist_move(
+                        error_px=(m["dx"], m["dy"]),
+                        aim_strength=m["aim_strength"],
+                        snap_distance=m["snap_distance"],
+                        curve=m["aim_curve"],
+                        curve_intensity=m["curve_intensity"],
+                        constant_speed_px=m["constant_speed_px"],
+                        accel_boost=m["accel_boost"],
+                        overshoot_guard=m["overshoot_guard"],
+                        smoothing_alpha=m["aim_smoothing_alpha"],
+                        noise_px=m["noise_amount"],
+                        sens_mult_x=m["sens_mult_x"],
+                        sens_mult_y=m["sens_mult_y"],
+                        rule_name=m["name"],
+                    )
+                    if mdx or mdy:
+                        if _eased and (abs(mdx) > 15 or abs(mdy) > 15):
+                            vmouse.eased_emit_rel(mdx, mdy)
+                        else:
+                            vmouse.emit_rel(mdx, mdy)
 
                 if click_ready:
                     best_click = min(click_ready, key=lambda item: item["d2"])
