@@ -258,7 +258,9 @@ class TemplatesTests(unittest.TestCase):
         self.assertIsNotNone(tpl)
         assert tpl is not None
         self.assertEqual(tpl["label"], "Linear")
-        self.assertEqual(len(tpl["points"]), 2)
+        self.assertGreater(len(tpl["points"]), 2)
+        for x, y in tpl["points"]:
+            self.assertAlmostEqual(x, y)
 
     def test_exponential_structure(self) -> None:
         tpl = TEMPLATES.get("exponential")
@@ -531,7 +533,9 @@ class AimCurveEditorPureApiTests(unittest.TestCase):
 
     def test_template_points(self) -> None:
         pts = self.editor.template_points("linear")
-        self.assertEqual(len(pts), 2)
+        self.assertGreater(len(pts), 2)
+        self.assertEqual(pts[0], [0.0, 0.0])
+        self.assertEqual(pts[-1], [1.0, 1.0])
 
     def test_template_points_unknown(self) -> None:
         pts = self.editor.template_points("nonexistent")

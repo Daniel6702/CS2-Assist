@@ -26,10 +26,9 @@ class SharedSettingsTab(BaseTab):
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(12)
 
-        # Shared Input / Sensitivity section
-        shared_group = QtWidgets.QGroupBox("Shared Input / Sensitivity")
+        shared_group = QtWidgets.QGroupBox("Shared Input / Game Settings")
         shared_layout = QtWidgets.QFormLayout(shared_group)
-        shared_layout.setLabelAlignment(QtCore.Qt.AlignTop)
+        shared_layout.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         shared_layout.setHorizontalSpacing(12)
         shared_layout.setVerticalSpacing(6)
 
@@ -42,19 +41,28 @@ class SharedSettingsTab(BaseTab):
         self.shared_game_sensitivity.setSingleStep(0.01)
         shared_layout.addRow("Game / program sensitivity", self.shared_game_sensitivity)
 
-        note = QtWidgets.QLabel(
-            "Used by keyboard-based features for the selected input device, and by recoil / CV trigger for sensitivity scaling."
-        )
-        note.setWordWrap(True)
-        note.setStyleSheet("color: #666;")
-        shared_layout.addRow("", note)
+        self.shared_game_width = QtWidgets.QSpinBox()
+        self.shared_game_width.setRange(1, 100000)
+        self.shared_game_width.setSingleStep(10)
+        self.shared_game_height = QtWidgets.QSpinBox()
+        self.shared_game_height.setRange(1, 100000)
+        self.shared_game_height.setSingleStep(10)
+        resolution_row = QtWidgets.QWidget()
+        resolution_layout = QtWidgets.QHBoxLayout(resolution_row)
+        resolution_layout.setContentsMargins(0, 0, 0, 0)
+        resolution_layout.addWidget(QtWidgets.QLabel("Width"))
+        resolution_layout.addWidget(self.shared_game_width)
+        resolution_layout.addWidget(QtWidgets.QLabel("Height"))
+        resolution_layout.addWidget(self.shared_game_height)
+        resolution_layout.addStretch(1)
+        shared_layout.addRow("In-game resolution", resolution_row)
 
         layout.addWidget(shared_group)
 
         # Game State Integration section
         gsi_group = QtWidgets.QGroupBox("Game State Integration")
         gsi_layout = QtWidgets.QFormLayout(gsi_group)
-        gsi_layout.setLabelAlignment(QtCore.Qt.AlignTop)
+        gsi_layout.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         gsi_layout.setHorizontalSpacing(12)
         gsi_layout.setVerticalSpacing(6)
 
@@ -82,7 +90,7 @@ class SharedSettingsTab(BaseTab):
 
         # Left column — existing hotkeys
         left_form = QtWidgets.QFormLayout()
-        left_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        left_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         left_form.setHorizontalSpacing(12)
         left_form.setVerticalSpacing(6)
 
@@ -105,7 +113,7 @@ class SharedSettingsTab(BaseTab):
 
         # Right column — overlay hotkey
         right_form = QtWidgets.QFormLayout()
-        right_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        right_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         right_form.setHorizontalSpacing(12)
         right_form.setVerticalSpacing(6)
 
@@ -144,7 +152,7 @@ class SharedSettingsTab(BaseTab):
         def _make_comp_box(title: str, fields: list[tuple[str, QtWidgets.QWidget]]) -> QtWidgets.QGroupBox:
             box = QtWidgets.QGroupBox(title)
             fl = QtWidgets.QFormLayout(box)
-            fl.setLabelAlignment(QtCore.Qt.AlignTop)
+            fl.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
             fl.setHorizontalSpacing(10)
             fl.setVerticalSpacing(4)
             fl.setContentsMargins(6, 6, 6, 6)
@@ -223,6 +231,11 @@ class SharedSettingsTab(BaseTab):
         index = self.shared_keyboard_device.findData(str(shared.get("keyboard_device_path", "")))
         self.shared_keyboard_device.setCurrentIndex(index if index >= 0 else 0)
         self.shared_game_sensitivity.setValue(float(shared.get("game_sensitivity", 1.0) or 1.0))
+        game_resolution = shared.get("game_resolution", {"width": 1600, "height": 1200})
+        if not isinstance(game_resolution, dict):
+            game_resolution = {"width": 1600, "height": 1200}
+        self.shared_game_width.setValue(max(1, int(game_resolution.get("width", 1600) or 1600)))
+        self.shared_game_height.setValue(max(1, int(game_resolution.get("height", 1200) or 1200)))
 
         # GSI settings
         gsi = config.get("gsi", {})
@@ -264,6 +277,10 @@ class SharedSettingsTab(BaseTab):
             "shared": {
                 "keyboard_device_path": self.shared_keyboard_device.currentData() or "",
                 "game_sensitivity": self.shared_game_sensitivity.value(),
+                "game_resolution": {
+                    "width": self.shared_game_width.value(),
+                    "height": self.shared_game_height.value(),
+                },
             },
             "gsi": {
                 "enabled": self.gsi_enabled.isChecked(),

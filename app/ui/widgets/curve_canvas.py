@@ -13,7 +13,10 @@ class CurveCanvas(QtWidgets.QWidget):
         self._points: list[tuple[float, float]] = [(0.0, 0.0), (1.0, 1.0)]
         self._selected_index = -1
         self._dragging_index = -1
-        self._margin = 20
+        self._left_margin = 56
+        self._top_margin = 22
+        self._right_margin = 28
+        self._bottom_margin = 46
         self._hit_radius = 10.0
         self._editable = True
         self.setMinimumHeight(260)
@@ -60,9 +63,13 @@ class CurveCanvas(QtWidgets.QWidget):
         return True
 
     def plot_rect(self) -> QtCore.QRectF:
-        margin = float(self._margin)
         rect = QtCore.QRectF(self.rect())
-        return rect.adjusted(margin, margin, -margin, -margin)
+        return rect.adjusted(
+            float(self._left_margin),
+            float(self._top_margin),
+            -float(self._right_margin),
+            -float(self._bottom_margin),
+        )
 
     def point_to_pos(self, point: tuple[float, float]) -> QtCore.QPointF:
         plot = self.plot_rect()
@@ -164,6 +171,32 @@ class CurveCanvas(QtWidgets.QWidget):
             painter.drawLine(QtCore.QPointF(plot.left(), y), QtCore.QPointF(plot.right(), y))
         painter.setPen(QtGui.QPen(palette.color(QtGui.QPalette.ColorRole.Text), 1))
         painter.drawRect(plot)
+        self._draw_axis_labels(painter, plot)
+
+    def _draw_axis_labels(self, painter: QtGui.QPainter, plot: QtCore.QRectF) -> None:
+        palette = self.palette()
+        painter.setPen(QtGui.QPen(palette.color(QtGui.QPalette.ColorRole.Text), 1))
+        font = painter.font()
+        font.setPointSize(max(8, font.pointSize() - 1))
+        painter.setFont(font)
+        metrics = QtGui.QFontMetrics(font)
+
+        distance_rect = QtCore.QRectF(plot.left(), plot.bottom() + 20.0, plot.width(), 18.0)
+        painter.drawText(distance_rect, QtCore.Qt.AlignmentFlag.AlignCenter, "Distance")
+
+        zero_rect = QtCore.QRectF(plot.left() - 16.0, plot.bottom() + 2.0, 32.0, 16.0)
+        painter.drawText(zero_rect, QtCore.Qt.AlignmentFlag.AlignCenter, "0")
+
+        snap_width = float(metrics.horizontalAdvance("Snap Distance")) + 4.0
+        snap_rect = QtCore.QRectF(plot.right() - snap_width, plot.bottom() + 2.0, snap_width, 16.0)
+        painter.drawText(snap_rect, QtCore.Qt.AlignmentFlag.AlignRight, "Snap Distance")
+
+        painter.save()
+        painter.translate(14.0, plot.center().y())
+        painter.rotate(-90.0)
+        velocity_rect = QtCore.QRectF(-plot.height() / 2.0, 0.0, plot.height(), 18.0)
+        painter.drawText(velocity_rect, QtCore.Qt.AlignmentFlag.AlignCenter, "Velocity")
+        painter.restore()
 
     def _draw_curve(self, painter: QtGui.QPainter) -> None:
         if len(self._points) < 2:

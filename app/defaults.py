@@ -23,6 +23,7 @@ def default_profile() -> dict[str, Any]:
             "shared": {
                 "keyboard_device_path": "",
                 "game_sensitivity": 1.0,
+                "game_resolution": {"width": 1600, "height": 1200},
             },
             "hotkeys": {
                 "cv_trigger": "F1",
@@ -117,8 +118,9 @@ def default_profile() -> dict[str, Any]:
             "cv_trigger": {
                 "enabled": False,
                 "model_path": str(MODEL_FILE),
-                "monitor": {"top": 0, "left": 0, "width": 2560, "height": 1440},
-                "game_resolution": {"width": 1600, "height": 1200},
+                "anti_oscillation_radius_px": 24.0,
+                "anti_oscillation_reserve_counts": 1,
+                "anti_oscillation_lock_frames": 2,
                 "aim_curves": build_curve_library(),
                 "configs": {
                     "rifle_alt_aim_only": {

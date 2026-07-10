@@ -77,7 +77,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
 
         status_group = QtWidgets.QGroupBox("Status")
         status_layout = QtWidgets.QFormLayout(status_group)
-        status_layout.setLabelAlignment(QtCore.Qt.AlignTop)
+        status_layout.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         status_layout.setHorizontalSpacing(12)
         status_layout.setVerticalSpacing(6)
         top_row.addWidget(status_group, 1)
@@ -92,7 +92,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
 
         target_group = QtWidgets.QGroupBox("Target Side")
         target_layout = QtWidgets.QFormLayout(target_group)
-        target_layout.setLabelAlignment(QtCore.Qt.AlignTop)
+        target_layout.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         target_layout.setHorizontalSpacing(12)
         target_layout.setVerticalSpacing(6)
         top_row.addWidget(target_group, 1)
@@ -110,93 +110,40 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         target_layout.addRow("Manual target side", self.manual_target_side)
         self.manual_target_side_label = target_layout.labelForField(self.manual_target_side)
 
-        capture_model_row = QtWidgets.QHBoxLayout()
-        capture_model_row.setSpacing(12)
-        outer.addLayout(capture_model_row)
-
-        capture_group = QtWidgets.QGroupBox("Capture")
-        capture_form = QtWidgets.QFormLayout(capture_group)
-        capture_form.setLabelAlignment(QtCore.Qt.AlignTop)
-        capture_form.setHorizontalSpacing(12)
-        capture_form.setVerticalSpacing(6)
-        capture_model_row.addWidget(capture_group, 1)
-
-        self.monitor_top = QtWidgets.QSpinBox()
-        self.monitor_top.setRange(-100000, 100000)
-        self.monitor_top.valueChanged.connect(self._emit_change)
-        self.monitor_left = QtWidgets.QSpinBox()
-        self.monitor_left.setRange(-100000, 100000)
-        self.monitor_left.valueChanged.connect(self._emit_change)
-        self.monitor_width = QtWidgets.QSpinBox()
-        self.monitor_width.setRange(1, 100000)
-        self.monitor_width.valueChanged.connect(self._emit_change)
-        self.monitor_height = QtWidgets.QSpinBox()
-        self.monitor_height.setRange(1, 100000)
-        self.monitor_height.valueChanged.connect(self._emit_change)
-        monitor_row = QtWidgets.QWidget()
-        monitor_layout = QtWidgets.QHBoxLayout(monitor_row)
-        monitor_layout.setContentsMargins(0, 0, 0, 0)
-        monitor_layout.addWidget(QtWidgets.QLabel("Top"))
-        monitor_layout.addWidget(self.monitor_top)
-        monitor_layout.addWidget(QtWidgets.QLabel("Left"))
-        monitor_layout.addWidget(self.monitor_left)
-        monitor_layout.addWidget(QtWidgets.QLabel("Width"))
-        monitor_layout.addWidget(self.monitor_width)
-        monitor_layout.addWidget(QtWidgets.QLabel("Height"))
-        monitor_layout.addWidget(self.monitor_height)
-        monitor_layout.addStretch(1)
-        capture_form.addRow("Monitor", monitor_row)
-
-        self.game_width = QtWidgets.QSpinBox()
-        self.game_width.setRange(1, 100000)
-        self.game_width.valueChanged.connect(self._emit_change)
-        self.game_height = QtWidgets.QSpinBox()
-        self.game_height.setRange(1, 100000)
-        self.game_height.valueChanged.connect(self._emit_change)
-        resolution_row = QtWidgets.QWidget()
-        resolution_layout = QtWidgets.QHBoxLayout(resolution_row)
-        resolution_layout.setContentsMargins(0, 0, 0, 0)
-        resolution_layout.addWidget(QtWidgets.QLabel("Width"))
-        resolution_layout.addWidget(self.game_width)
-        resolution_layout.addWidget(QtWidgets.QLabel("Height"))
-        resolution_layout.addWidget(self.game_height)
-        resolution_layout.addStretch(1)
-        capture_form.addRow("Game resolution", resolution_row)
-
-        model_group = QtWidgets.QGroupBox("Model")
+        model_group = QtWidgets.QGroupBox("Model Settings")
         model_form = QtWidgets.QFormLayout(model_group)
-        model_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        model_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         model_form.setHorizontalSpacing(12)
         model_form.setVerticalSpacing(6)
-        capture_model_row.addWidget(model_group, 1)
+        top_row.addWidget(model_group, 1)
 
         self.model_path = QtWidgets.QLineEdit()
         self.model_path.editingFinished.connect(self._emit_change)
         model_form.addRow("Model path", self.model_path)
-
-        tuning_row = QtWidgets.QHBoxLayout()
-        tuning_row.setSpacing(12)
-        outer.addLayout(tuning_row)
-
-        detection_group = QtWidgets.QGroupBox("Detection & Smoothing")
-        detection_form = QtWidgets.QFormLayout(detection_group)
-        detection_form.setLabelAlignment(QtCore.Qt.AlignTop)
-        detection_form.setHorizontalSpacing(12)
-        detection_form.setVerticalSpacing(6)
-        tuning_row.addWidget(detection_group, 1)
 
         self.inference_confidence = QtWidgets.QDoubleSpinBox()
         self.inference_confidence.setRange(0.0, 1.0)
         self.inference_confidence.setDecimals(4)
         self.inference_confidence.setSingleStep(0.01)
         self.inference_confidence.valueChanged.connect(self._emit_change)
-        detection_form.addRow("Inference confidence", self.inference_confidence)
+        model_form.addRow("Confidence", self.inference_confidence)
 
         self.inference_img_size = QtWidgets.QSpinBox()
         self.inference_img_size.setRange(32, 4096)
         self.inference_img_size.setSingleStep(32)
         self.inference_img_size.valueChanged.connect(self._emit_change)
-        detection_form.addRow("Inference image size", self.inference_img_size)
+        model_form.addRow("Image Size", self.inference_img_size)
+
+        tuning_row = QtWidgets.QHBoxLayout()
+        tuning_row.setSpacing(12)
+        outer.addLayout(tuning_row)
+
+        detection_group = QtWidgets.QGroupBox("Stability Tuning")
+        detection_form = QtWidgets.QFormLayout(detection_group)
+        detection_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+        detection_form.setHorizontalSpacing(12)
+        detection_form.setVerticalSpacing(6)
+        tuning_row.addWidget(detection_group, 1)
 
         self.jitter_deadzone_px = QtWidgets.QDoubleSpinBox()
         self.jitter_deadzone_px.setRange(0.0, 100.0)
@@ -221,7 +168,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
 
         prediction_group = QtWidgets.QGroupBox("Horizontal Prediction")
         prediction_form = QtWidgets.QFormLayout(prediction_group)
-        prediction_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        prediction_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         prediction_form.setHorizontalSpacing(12)
         prediction_form.setVerticalSpacing(6)
         tuning_row.addWidget(prediction_group, 1)
@@ -257,6 +204,32 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         self.x_prediction_max_delta_px.setSingleStep(1.0)
         self.x_prediction_max_delta_px.valueChanged.connect(self._emit_change)
         prediction_form.addRow("Max predicted X shift (px)", self.x_prediction_max_delta_px)
+
+        anti_oscillation_group = QtWidgets.QGroupBox("Anti-Oscillation")
+        anti_oscillation_form = QtWidgets.QFormLayout(anti_oscillation_group)
+        anti_oscillation_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+        anti_oscillation_form.setHorizontalSpacing(12)
+        anti_oscillation_form.setVerticalSpacing(6)
+        tuning_row.addWidget(anti_oscillation_group, 1)
+
+        self.anti_oscillation_radius_px = QtWidgets.QDoubleSpinBox()
+        self.anti_oscillation_radius_px.setRange(0.0, 250.0)
+        self.anti_oscillation_radius_px.setDecimals(1)
+        self.anti_oscillation_radius_px.setSingleStep(1.0)
+        self.anti_oscillation_radius_px.valueChanged.connect(self._emit_change)
+        anti_oscillation_form.addRow("Stability radius (px)", self.anti_oscillation_radius_px)
+
+        self.anti_oscillation_reserve_counts = QtWidgets.QSpinBox()
+        self.anti_oscillation_reserve_counts.setRange(0, 10)
+        self.anti_oscillation_reserve_counts.setSingleStep(1)
+        self.anti_oscillation_reserve_counts.valueChanged.connect(self._emit_change)
+        anti_oscillation_form.addRow("Reserve counts", self.anti_oscillation_reserve_counts)
+
+        self.anti_oscillation_lock_frames = QtWidgets.QSpinBox()
+        self.anti_oscillation_lock_frames.setRange(0, 10)
+        self.anti_oscillation_lock_frames.setSingleStep(1)
+        self.anti_oscillation_lock_frames.valueChanged.connect(self._emit_change)
+        anti_oscillation_form.addRow("Reversal lock frames", self.anti_oscillation_lock_frames)
 
         aim_curve_group = QtWidgets.QGroupBox("Aim Motion Curves")
         aim_curve_layout = QtWidgets.QVBoxLayout(aim_curve_group)
@@ -308,19 +281,6 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         try:
             self.enabled.setChecked(bool(data.get("enabled", False)))
             self.model_path.setText(str(data.get("model_path", "")))
-            monitor = data.get("monitor", {"top": 0, "left": 0, "width": 2560, "height": 1440})
-            if not isinstance(monitor, dict):
-                monitor = {"top": 0, "left": 0, "width": 2560, "height": 1440}
-            self.monitor_top.setValue(int(monitor.get("top", 0) or 0))
-            self.monitor_left.setValue(int(monitor.get("left", 0) or 0))
-            self.monitor_width.setValue(max(1, int(monitor.get("width", 2560) or 2560)))
-            self.monitor_height.setValue(max(1, int(monitor.get("height", 1440) or 1440)))
-
-            game_resolution = data.get("game_resolution", {"width": 1600, "height": 1200})
-            if not isinstance(game_resolution, dict):
-                game_resolution = {"width": 1600, "height": 1200}
-            self.game_width.setValue(max(1, int(game_resolution.get("width", 1600) or 1600)))
-            self.game_height.setValue(max(1, int(game_resolution.get("height", 1200) or 1200)))
             self.use_gsi_opponent_side.setChecked(bool(data.get("use_gsi_opponent_side", False)))
             side_idx = self.manual_target_side.findData(str(data.get("manual_target_side", "both")))
             self.manual_target_side.setCurrentIndex(side_idx if side_idx >= 0 else self.manual_target_side.findData("both"))
@@ -334,6 +294,9 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
             self.x_prediction_history_ms.setValue(float(data.get("x_prediction_history_ms", 90.0) or 90.0))
             self.x_prediction_damping.setValue(float(data.get("x_prediction_damping", 0.35) or 0.35))
             self.x_prediction_max_delta_px.setValue(float(data.get("x_prediction_max_delta_px", 36.0) or 36.0))
+            self.anti_oscillation_radius_px.setValue(float(data.get("anti_oscillation_radius_px", 24.0) or 0.0))
+            self.anti_oscillation_reserve_counts.setValue(int(data.get("anti_oscillation_reserve_counts", 1) or 0))
+            self.anti_oscillation_lock_frames.setValue(int(data.get("anti_oscillation_lock_frames", 2) or 0))
             self.aim_curve_editor.load_curves(load_curves(data.get("aim_curves")))
             self._clear_rules()
             configs = dict(data.get("configs", {}))
@@ -373,16 +336,6 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         config: dict[str, Any] = {
             "enabled": self.enabled.isChecked(),
             "model_path": self.model_path.text().strip(),
-            "monitor": {
-                "top": self.monitor_top.value(),
-                "left": self.monitor_left.value(),
-                "width": self.monitor_width.value(),
-                "height": self.monitor_height.value(),
-            },
-            "game_resolution": {
-                "width": self.game_width.value(),
-                "height": self.game_height.value(),
-            },
             "use_gsi_opponent_side": self.use_gsi_opponent_side.isChecked(),
             "manual_target_side": str(self.manual_target_side.currentData() or "both"),
             "inference_confidence": self.inference_confidence.value(),
@@ -395,6 +348,9 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
             "x_prediction_history_ms": self.x_prediction_history_ms.value(),
             "x_prediction_damping": self.x_prediction_damping.value(),
             "x_prediction_max_delta_px": self.x_prediction_max_delta_px.value(),
+            "anti_oscillation_radius_px": self.anti_oscillation_radius_px.value(),
+            "anti_oscillation_reserve_counts": self.anti_oscillation_reserve_counts.value(),
+            "anti_oscillation_lock_frames": self.anti_oscillation_lock_frames.value(),
             "configs": {},
         }
 

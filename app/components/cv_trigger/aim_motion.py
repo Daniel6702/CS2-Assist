@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable
 
 CurvePoint = tuple[float, float]
 
@@ -17,6 +17,8 @@ class AimMotionConfig:
     sens_mult_y: float
     noise_px: float
     curve_points: list[CurvePoint]
+    anti_oscillation_radius_px: float = 0.0
+    anti_oscillation_reserve_counts: int = 0
 
 
 @dataclass(frozen=True)
@@ -52,7 +54,8 @@ def interpolate_curve(points: list[CurvePoint], x: float) -> float:
 def compute_aim_motion(
     error_px: tuple[float, float],
     config: AimMotionConfig,
-    noise_rng: Optional[Callable[[float, float], float]] = None,
+    noise_rng: Callable[[float, float], float] | None = None,
+    limit_error_px: tuple[float, float] | None = None,
 ) -> AimMotionResult:
     ex, ey = error_px
     distance = math.hypot(ex, ey)
@@ -81,10 +84,6 @@ def compute_aim_motion(
     mouse_x = raw_x * config.sens_mult_x
     mouse_y = raw_y * config.sens_mult_y
 
-    # Max allowed counts per axis — cannot cross target in mouse space
-    max_x = int(round(abs(ex * config.sens_mult_x)))
-    max_y = int(round(abs(ey * config.sens_mult_y)))
-
     dx_raw = int(round(mouse_x))
     dy_raw = int(round(mouse_y))
 
@@ -96,11 +95,33 @@ def compute_aim_motion(
         dx_raw += int(round(noise_x * config.sens_mult_x))
         dy_raw += int(round(noise_y * config.sens_mult_y))
 
-    sx = 1 if ex >= 0 else -1
-    sy = 1 if ey >= 0 else -1
+    safety_error = limit_error_px if limit_error_px is not None else error_px
+    reserve_counts = _reserve_counts_for_error(safety_error, config)
+    dx = _clamp_axis_to_error(dx_raw, safety_error[0], config.sens_mult_x, reserve_counts)
+    dy = _clamp_axis_to_error(dy_raw, safety_error[1], config.sens_mult_y, reserve_counts)
 
-    dx = sx * min(abs(dx_raw), max_x) if max_x > 0 else 0
-    dy = sy * min(abs(dy_raw), max_y) if max_y > 0 else 0
-
-    arrived = max_x == 0 and max_y == 0
+    arrived = _safe_count_limit(safety_error[0], config.sens_mult_x, reserve_counts) == 0 and _safe_count_limit(safety_error[1], config.sens_mult_y, reserve_counts) == 0
     return AimMotionResult(dx=dx, dy=dy, arrived=arrived)
+
+
+def _reserve_counts_for_error(error_px: tuple[float, float], config: AimMotionConfig) -> int:
+    if config.anti_oscillation_radius_px <= 0.0:
+        return 0
+    if math.hypot(error_px[0], error_px[1]) > config.anti_oscillation_radius_px:
+        return 0
+    return max(0, config.anti_oscillation_reserve_counts)
+
+
+def _safe_count_limit(error_px: float, sens_mult: float, reserve_counts: int = 0) -> int:
+    raw_limit = int(math.floor(abs(error_px * sens_mult) + 1e-9))
+    return max(0, raw_limit - reserve_counts)
+
+
+def _clamp_axis_to_error(proposed: int, error_px: float, sens_mult: float, reserve_counts: int = 0) -> int:
+    safe = _safe_count_limit(error_px, sens_mult, reserve_counts)
+    if safe <= 0 or proposed == 0 or error_px == 0.0:
+        return 0
+    target_sign = 1 if error_px > 0.0 else -1
+    if proposed * target_sign <= 0:
+        return 0
+    return target_sign * min(abs(proposed), safe)

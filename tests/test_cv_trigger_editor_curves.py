@@ -5,17 +5,18 @@ import sys
 import unittest
 from typing import Any
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+_ = os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6 import QtCore, QtWidgets  # noqa: E402
+from PySide6 import QtWidgets  # noqa: E402
 
 app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
 
+from app.device_service import DeviceService  # noqa: E402
 from app.ui.widgets.cv_trigger_editor import CVTriggerEditor, _normalize_cv_trigger_config_for_ui  # noqa: E402
 
 
 def _make_editor() -> CVTriggerEditor:
-    return CVTriggerEditor("cv_trigger", "CV Trigger", device_service=None)
+    return CVTriggerEditor("cv_trigger", "CV Trigger", device_service=DeviceService())
 
 
 def _base_config() -> dict[str, Any]:
@@ -177,6 +178,28 @@ class PreservesExistingTests(unittest.TestCase):
         extracted = editor.extract_config()
         self.assertEqual(extracted["model_path"], "/custom/model.pt")
 
+    def test_capture_settings_do_not_round_trip_from_cv_editor(self) -> None:
+        editor = _make_editor()
+        editor.load_config(_base_config())
+
+        extracted = editor.extract_config()
+        self.assertNotIn("monitor", extracted)
+        self.assertNotIn("game_resolution", extracted)
+
+    def test_global_anti_oscillation_settings_round_trip(self) -> None:
+        config = _base_config()
+        config["anti_oscillation_radius_px"] = 18.5
+        config["anti_oscillation_reserve_counts"] = 2
+        config["anti_oscillation_lock_frames"] = 3
+
+        editor = _make_editor()
+        editor.load_config(config)
+
+        extracted = editor.extract_config()
+        self.assertEqual(extracted["anti_oscillation_radius_px"], 18.5)
+        self.assertEqual(extracted["anti_oscillation_reserve_counts"], 2)
+        self.assertEqual(extracted["anti_oscillation_lock_frames"], 3)
+
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

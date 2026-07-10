@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Callable
+from typing import Any, Callable
 
 from app.components.base import BaseComponent
 from app.components.bhop import BhopComponent
@@ -11,6 +11,7 @@ from app.components.pixel_trigger import PixelTriggerComponent
 from app.components.recoil import RecoilComponent
 from app.components.snap_tap import SnapTapComponent
 from app.gsi import GSIServer, GameState
+from app.platform.monitor import default_monitor_geometry
 
 
 class RuntimeManager:
@@ -32,7 +33,7 @@ class RuntimeManager:
         self._gsi_gate_open = False
         self._gsi_gate_reason = "waiting_for_alive_gsi"
 
-    def _effective_component_config(self, profile: dict, name: str) -> dict:
+    def _effective_component_config(self, profile: dict[str, Any], name: str) -> dict[str, Any]:
         components_cfg = profile.get("components", {}) or {}
         cfg = deepcopy(dict(components_cfg.get(name, {})))
         shared = dict((profile.get("app", {}) or {}).get("shared", {}) or {})
@@ -40,6 +41,11 @@ class RuntimeManager:
 
         keyboard_device_path = str(shared.get("keyboard_device_path", "") or "")
         game_sensitivity = float(shared.get("game_sensitivity", 1.0) or 1.0)
+        game_resolution = shared.get("game_resolution")
+        if not isinstance(game_resolution, dict):
+            game_resolution = cfg.get("game_resolution", {"width": 1600, "height": 1200})
+        if not isinstance(game_resolution, dict):
+            game_resolution = {"width": 1600, "height": 1200}
 
         if name in {"bhop", "snap_tap", "counter_strafe"}:
             cfg["device_path"] = keyboard_device_path
@@ -53,6 +59,11 @@ class RuntimeManager:
 
         if name == "cv_trigger":
             cfg["user_sens"] = game_sensitivity
+            cfg["game_resolution"] = {
+                "width": max(1, int(game_resolution.get("width", 1600) or 1600)),
+                "height": max(1, int(game_resolution.get("height", 1200) or 1200)),
+            }
+            cfg["monitor"] = default_monitor_geometry().as_capture_dict()
             recoil_cfg = deepcopy(dict(components_cfg.get("recoil", {})))
             recoil_sens = recoil_cfg.get("sensitivity", {})
             if not isinstance(recoil_sens, dict):
@@ -83,13 +94,13 @@ class RuntimeManager:
         for component in self.components.values():
             component.set_runtime_gate(self._gsi_gate_open, self._gsi_gate_reason)
 
-    def configure_all(self, profile: dict) -> None:
+    def configure_all(self, profile: dict[str, Any]) -> None:
         components_cfg = profile.get("components", {})
         for name, component in self.components.items():
             component.configure(self._effective_component_config(profile, name))
         self._apply_runtime_gate()
 
-    def apply_enabled_states(self, profile: dict) -> None:
+    def apply_enabled_states(self, profile: dict[str, Any]) -> None:
         components_cfg = profile.get("components", {})
         for name, component in self.components.items():
             cfg = components_cfg.get(name, {})
@@ -99,7 +110,7 @@ class RuntimeManager:
             elif not should_run and component.enabled:
                 component.stop()
 
-    def restart_component(self, name: str, profile: dict) -> None:
+    def restart_component(self, name: str, profile: dict[str, Any]) -> None:
         component = self.components[name]
         cfg = self._effective_component_config(profile, name)
         component.configure(cfg)
@@ -117,7 +128,7 @@ class RuntimeManager:
             self.gsi_server.stop()
             self.gsi_server = None
 
-    def configure_gsi(self, gsi_cfg: dict) -> None:
+    def configure_gsi(self, gsi_cfg: dict[str, Any]) -> None:
         enabled = bool(gsi_cfg.get("enabled", True))
         host = str(gsi_cfg.get("host", "127.0.0.1"))
         port = int(gsi_cfg.get("port", 3000))

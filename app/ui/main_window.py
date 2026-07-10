@@ -5,8 +5,10 @@ from typing import Any, Final
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from app.common import deep_copy, deep_get, deep_set
+from app.components.recoil import RecoilComponent
 from app.device_service import DeviceService
 from app.profile_store import ProfileStore
+from app.platform.monitor import default_monitor_geometry
 from app.runtime import RuntimeManager
 from app.ui.hotkeys import HotkeyBridge
 from app.ui import styles
@@ -19,7 +21,8 @@ from app.ui.tabs import (
     RecoilTab,
     SharedSettingsTab,
 )
-from app.ui.widgets import BulletImpactOverlay, LogBridge
+from app.ui.widgets.bullet_overlay import BulletImpactOverlay
+from app.ui.widgets.log_bridge import LogBridge
 
 
 _COMPONENT_SCHEMA_NAMES: Final[frozenset[str]] = frozenset(name for name, _title, _schema in component_schemas())
@@ -63,7 +66,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self._loading_profile = False
         self._closing = False
         self._overlay_active = False
-        self._saved_window_flags: QtCore.Qt.WindowFlags | None = None
+        self._saved_window_flags: QtCore.Qt.WindowType = self.windowFlags()
+
+        self.profile_combo: QtWidgets.QComboBox
+        self.new_profile_btn: QtWidgets.QPushButton
+        self.duplicate_profile_btn: QtWidgets.QPushButton
+        self.delete_profile_btn: QtWidgets.QPushButton
+        self.save_profile_btn: QtWidgets.QPushButton
+        self.apply_profile_btn: QtWidgets.QPushButton
+        self.refresh_devices_btn: QtWidgets.QPushButton
+        self.stop_all_btn: QtWidgets.QPushButton
 
         central = QtWidgets.QWidget()
         self.setCentralWidget(central)
@@ -131,6 +143,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Connect signals
         self.shared_settings_tab.shared_keyboard_device.currentTextChanged.connect(self._on_shared_settings_changed)
         self.shared_settings_tab.shared_game_sensitivity.valueChanged.connect(self._on_shared_settings_changed)
+        self.shared_settings_tab.shared_game_width.valueChanged.connect(self._on_shared_settings_changed)
+        self.shared_settings_tab.shared_game_height.valueChanged.connect(self._on_shared_settings_changed)
         self.shared_settings_tab.gsi_enabled.stateChanged.connect(self._on_gsi_changed)
         self.shared_settings_tab.gsi_host.editingFinished.connect(self._on_gsi_changed)
         self.shared_settings_tab.gsi_port.valueChanged.connect(self._on_gsi_changed)
@@ -172,20 +186,11 @@ class MainWindow(QtWidgets.QMainWindow):
         }
 
     def _bullet_overlay_geometry(self) -> tuple[float, float, float, float] | None:
-        monitor = dict(deep_get(self.current_profile_data, "components.cv_trigger.monitor", {}) or {})
-        if not monitor:
-            screen = QtGui.QGuiApplication.primaryScreen()
-            if screen is None:
-                return None
-            geom = screen.geometry()
-            return float(geom.x()), float(geom.y()), float(geom.width()), float(geom.height())
-        try:
-            left = float(monitor.get("left", 0))
-            top = float(monitor.get("top", 0))
-            width = float(monitor.get("width", 0))
-            height = float(monitor.get("height", 0))
-        except Exception:
-            return None
+        monitor = default_monitor_geometry()
+        left = float(monitor.left)
+        top = float(monitor.top)
+        width = float(monitor.width)
+        height = float(monitor.height)
         if width <= 0 or height <= 0:
             return None
         return left, top, width, height
@@ -209,7 +214,7 @@ class MainWindow(QtWidgets.QMainWindow):
             monitor_geometry=(int(left), int(top), int(mon_width), int(mon_height)),
         )
         recoil = self.runtime.components.get("recoil")
-        if recoil is None or not hasattr(recoil, "get_alignment_state"):
+        if not isinstance(recoil, RecoilComponent):
             self.bullet_overlay.hide_overlay()
             return
         try:
@@ -229,7 +234,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         shared = dict(deep_get(self.current_profile_data, "app.shared", {}) or {})
         user_sens = max(1e-6, float(shared.get("game_sensitivity", 1.0) or 1.0))
-        game_res = dict(deep_get(self.current_profile_data, "components.cv_trigger.game_resolution", {}) or {})
+        game_res = dict(deep_get(self.current_profile_data, "app.shared.game_resolution", {}) or {})
+        if not game_res:
+            game_res = dict(deep_get(self.current_profile_data, "components.cv_trigger.game_resolution", {}) or {})
         game_width = max(1.0, float(game_res.get("width", 1600) or 1600))
         game_height = max(1.0, float(game_res.get("height", 1200) or 1200))
         base_sens_mult_x = (game_width / max(1.0, mon_width)) / user_sens
@@ -286,7 +293,12 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             self.current_profile_name = name
             self.current_profile_data = self.profile_store.load_profile(name)
-            self.shared_settings_tab.load_config(deep_get(self.current_profile_data, "app", {}))
+            app_config = deep_copy(deep_get(self.current_profile_data, "app", {}) or {})
+            if not deep_get(app_config, "shared.game_resolution"):
+                legacy_game_resolution = deep_get(self.current_profile_data, "components.cv_trigger.game_resolution")
+                if isinstance(legacy_game_resolution, dict):
+                    deep_set(app_config, "shared.game_resolution", legacy_game_resolution)
+            self.shared_settings_tab.load_config(app_config)
             self.movement_tab.load_config(deep_get(self.current_profile_data, "components", {}))
             self.recoil_tab.load_config(deep_get(self.current_profile_data, "components.recoil", {}))
             self.pixel_trigger_tab.load_config(deep_get(self.current_profile_data, "components.pixel_trigger", {}))
@@ -404,8 +416,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _toggle_overlay(self) -> None:
         if self._overlay_active:
-            flags = self._saved_window_flags if self._saved_window_flags else self.windowFlags()
-            self.setWindowFlags(flags)
+            self.setWindowFlags(self._saved_window_flags)
             self._overlay_active = False
             self._append_log("hotkeys", "[INFO] Overlay disabled.")
         else:
@@ -415,8 +426,8 @@ class MainWindow(QtWidgets.QMainWindow):
             # game on top.  The BulletImpactOverlay uses the same flag.
             self.setWindowFlags(
                 self._saved_window_flags
-                | QtCore.Qt.WindowStaysOnTopHint
-                | QtCore.Qt.X11BypassWindowManagerHint
+                | QtCore.Qt.WindowType.WindowStaysOnTopHint
+                | QtCore.Qt.WindowType.X11BypassWindowManagerHint
             )
             self._overlay_active = True
             self._append_log("hotkeys", "[INFO] Overlay enabled (always-on-top).")
@@ -513,7 +524,7 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.warning(self, "Delete Profile", "Default profile cannot be deleted.")
             return
         confirm = QtWidgets.QMessageBox.question(self, "Delete Profile", f"Delete profile '{self.current_profile_name}'?")
-        if confirm != QtWidgets.QMessageBox.Yes:
+        if confirm != QtWidgets.QMessageBox.StandardButton.Yes:
             return
         self.profile_store.delete_profile(self.current_profile_name)
         self.current_profile_name = "Default"

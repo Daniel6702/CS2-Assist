@@ -3,8 +3,12 @@ from pathlib import Path
 
 from app.components.cv_trigger.core import (
     _aim_point_for_box,
+    _anti_oscillation_reversal_lock_frames,
     _auto_shoot_zone_contains_crosshair,
     _curve_points_for_rule,
+    _lock_body_y_axis,
+    _raw_aim_error,
+    _raw_error_sign,
     _shot_cooldown_active,
     _smoothed_error_for_rule,
 )
@@ -47,6 +51,9 @@ class CVTriggerDecisionTests(unittest.TestCase):
         source = Path("app/components/cv_trigger/core.py").read_text(encoding="utf-8")
 
         self.assertIn("aim_motion.compute_aim_motion", source)
+        self.assertIn("limit_error_px=", source)
+        self.assertIn("limit_error_px=(m[\"limit_dx\"], m[\"limit_dy\"])", source)
+        self.assertIn("per_rule_smooth.pop(m[\"name\"], None)", source)
         for forbidden in ("def _response_fraction", "curve_intensity", "constant_speed_px", "accel_boost"):
             self.assertNotIn(forbidden, source)
 
@@ -69,6 +76,52 @@ class CVTriggerDecisionTests(unittest.TestCase):
         self.assertEqual(smoothed, (15.0, -15.0))
         self.assertEqual(state["rule"], smoothed)
 
+    def test_anti_oscillation_reversal_lock_only_inside_radius(self) -> None:
+        previous = _raw_error_sign((5.0, 0.0), deadzone_px=0.5)
+        current = _raw_error_sign((-4.0, 0.0), deadzone_px=0.5)
+
+        locked = _anti_oscillation_reversal_lock_frames(
+            previous_sign=previous,
+            current_sign=current,
+            distance_px=4.0,
+            radius_px=24.0,
+            lock_frames=2,
+        )
+        far = _anti_oscillation_reversal_lock_frames(
+            previous_sign=previous,
+            current_sign=current,
+            distance_px=40.0,
+            radius_px=24.0,
+            lock_frames=2,
+        )
+
+        self.assertEqual(locked, 2)
+        self.assertEqual(far, 0)
+
+    def test_body_mode_in_band_target_is_x_axis_only_during_spray(self) -> None:
+        raw_x, raw_y = _raw_aim_error(
+            target=(100.0, 120.0),
+            predicted_bullet=(92.0, 80.0),
+            body_y_axis_loose=True,
+        )
+
+        self.assertEqual(raw_x, 8.0)
+        self.assertEqual(raw_y, 0.0)
+
+    def test_body_mode_outside_band_keeps_y_axis_correction(self) -> None:
+        raw_x, raw_y = _raw_aim_error(
+            target=(100.0, 120.0),
+            predicted_bullet=(92.0, 80.0),
+            body_y_axis_loose=False,
+        )
+
+        self.assertEqual(raw_x, 8.0)
+        self.assertEqual(raw_y, 40.0)
+
+    def test_body_mode_line_target_removes_carried_y_smoothing(self) -> None:
+        self.assertEqual(_lock_body_y_axis((5.0, -12.0), body_y_axis_loose=True), (5.0, 0.0))
+        self.assertEqual(_lock_body_y_axis((5.0, -12.0), body_y_axis_loose=False), (5.0, -12.0))
+
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

@@ -59,6 +59,38 @@ def _aim_point_for_box(
     return tx, provisional if provisional < knee else knee
 
 
+def _body_y_axis_is_loose(
+    *,
+    box: tuple[int, int, int, int],
+    crosshair: tuple[int, int],
+    aim_mode: str,
+    body_knee_offset: float,
+) -> bool:
+    if aim_mode != "body":
+        return False
+    _, y1, _, y2 = box
+    _, cy = crosshair
+    knee = int(y1 + body_knee_offset * (y2 - y1))
+    return y1 <= cy <= knee
+
+
+def _raw_aim_error(
+    *,
+    target: tuple[float, float],
+    predicted_bullet: tuple[float, float],
+    body_y_axis_loose: bool,
+) -> tuple[float, float]:
+    raw_x = target[0] - predicted_bullet[0]
+    raw_y = 0.0 if body_y_axis_loose else target[1] - predicted_bullet[1]
+    return raw_x, raw_y
+
+
+def _lock_body_y_axis(error_px: tuple[float, float], *, body_y_axis_loose: bool) -> tuple[float, float]:
+    if body_y_axis_loose:
+        return error_px[0], 0.0
+    return error_px
+
+
 def _auto_shoot_zone_contains_crosshair(
     *,
     box: tuple[int, int, int, int],
@@ -116,6 +148,30 @@ def _smoothed_error_for_rule(
         smoothed = error_px
     per_rule_smooth[rule_name] = smoothed
     return smoothed
+
+
+def _raw_error_sign(error_px: tuple[float, float], deadzone_px: float) -> tuple[int, int]:
+    def axis_sign(value: float) -> int:
+        if abs(value) <= deadzone_px:
+            return 0
+        return 1 if value > 0.0 else -1
+
+    return axis_sign(error_px[0]), axis_sign(error_px[1])
+
+
+def _anti_oscillation_reversal_lock_frames(
+    *,
+    previous_sign: tuple[int, int] | None,
+    current_sign: tuple[int, int],
+    distance_px: float,
+    radius_px: float,
+    lock_frames: int,
+) -> int:
+    if previous_sign is None or radius_px <= 0.0 or lock_frames <= 0 or distance_px > radius_px:
+        return 0
+    x_reversed = previous_sign[0] != 0 and current_sign[0] != 0 and previous_sign[0] != current_sign[0]
+    y_reversed = previous_sign[1] != 0 and current_sign[1] != 0 and previous_sign[1] != current_sign[1]
+    return lock_frames if x_reversed or y_reversed else 0
 
 
 class CVTriggerComponent(BaseComponent):
@@ -407,6 +463,12 @@ class CVTriggerComponent(BaseComponent):
         x_prediction_max_delta_px = float(config.get("x_prediction_max_delta_px", 36.0) or 36.0)
         x_prediction_min_samples = max(2, int(config.get("x_prediction_min_samples", 3) or 3))
         x_prediction_reset_px = float(config.get("x_prediction_reset_px", 120.0) or 120.0)
+        anti_oscillation_radius_raw = config.get("anti_oscillation_radius_px", 24.0)
+        anti_oscillation_reserve_raw = config.get("anti_oscillation_reserve_counts", 1)
+        anti_oscillation_lock_raw = config.get("anti_oscillation_lock_frames", 2)
+        anti_oscillation_radius_px = max(0.0, float(24.0 if anti_oscillation_radius_raw is None else anti_oscillation_radius_raw))
+        anti_oscillation_reserve_counts = max(0, int(1 if anti_oscillation_reserve_raw is None else anti_oscillation_reserve_raw))
+        anti_oscillation_lock_frames = max(0, int(2 if anti_oscillation_lock_raw is None else anti_oscillation_lock_raw))
 
         _sf = dict(config.get("_safety", {}))
         _enabled = bool(_sf.get("enabled", False))
@@ -472,6 +534,8 @@ class CVTriggerComponent(BaseComponent):
         cooldown_until: dict[str, float] = {name: 0.0 for name in enabled_configs}
         aim_cooldown_until: dict[str, float] = {name: 0.0 for name in enabled_configs}
         filtered_error: dict[str, tuple[float, float] | None] = {name: None for name in enabled_configs}
+        raw_error_signs: dict[str, tuple[int, int] | None] = {name: None for name in enabled_configs}
+        reversal_locks: dict[str, int] = {name: 0 for name in enabled_configs}
         previous_active: tuple[str, ...] = ()
         status_every = 0.0
 
@@ -492,6 +556,8 @@ class CVTriggerComponent(BaseComponent):
                         filtered_error[name] = None
                         aim_cooldown_until[name] = 0.0
                         per_rule_smooth.pop(name, None)
+                        raw_error_signs[name] = None
+                        reversal_locks[name] = 0
                     x_predictor.reset_many(settle.keys())
                     previous_active = ()
                     self._set_overlay_state(False)
@@ -516,6 +582,8 @@ class CVTriggerComponent(BaseComponent):
                         filtered_error[name] = None
                         aim_cooldown_until[name] = 0.0
                         per_rule_smooth.pop(name, None)
+                        raw_error_signs[name] = None
+                        reversal_locks[name] = 0
                         x_predictor.reset(name)
 
                 if tuple(active_names) != previous_active:
@@ -550,6 +618,8 @@ class CVTriggerComponent(BaseComponent):
                     for name in active_names:
                         settle[name] = 0
                         filtered_error[name] = None
+                        raw_error_signs[name] = None
+                        reversal_locks[name] = 0
                     self._set_overlay_state(False)
                     continue
 
@@ -575,6 +645,8 @@ class CVTriggerComponent(BaseComponent):
                     if not target_classes:
                         settle[name] = 0
                         filtered_error[name] = None
+                        raw_error_signs[name] = None
+                        reversal_locks[name] = 0
                         x_predictor.reset(name)
                         continue
 
@@ -621,6 +693,12 @@ class CVTriggerComponent(BaseComponent):
                             head_offset=float(cfg["HEAD_OFFSET"]),
                             body_knee_offset=float(cfg.get("BODY_KNEE_OFFSET", 0.50)),
                         )
+                        body_y_axis_loose = _body_y_axis_is_loose(
+                            box=box_tuple,
+                            crosshair=(cx, cy),
+                            aim_mode=aim_mode,
+                            body_knee_offset=float(cfg.get("BODY_KNEE_OFFSET", 0.50)),
+                        )
 
                         pred_bullet_cx = cx - spray_offset_x
                         pred_bullet_cy = cy - spray_offset_y
@@ -630,8 +708,11 @@ class CVTriggerComponent(BaseComponent):
                         pred_dx_from_center = pred_bullet_cx - cx
                         pred_dy_from_center = pred_bullet_cy - cy
 
-                        err_x = tx - pred_bullet_cx
-                        err_y = ty - pred_bullet_cy
+                        err_x, err_y = _raw_aim_error(
+                            target=(float(tx), float(ty)),
+                            predicted_bullet=(float(pred_bullet_cx), float(pred_bullet_cy)),
+                            body_y_axis_loose=body_y_axis_loose,
+                        )
 
                         if (
                             pred_dx_from_center != 0
@@ -657,6 +738,7 @@ class CVTriggerComponent(BaseComponent):
                                 "target_ty": float(ty),
                                 "pred_bullet_cx": float(pred_bullet_cx),
                                 "pred_bullet_cy": float(pred_bullet_cy),
+                                "body_y_axis_loose": body_y_axis_loose,
                             }
 
                         if _auto_shoot_zone_contains_crosshair(
@@ -678,6 +760,8 @@ class CVTriggerComponent(BaseComponent):
                         settle[name] = 0
                         filtered_error[name] = None
                         per_rule_smooth.pop(name, None)
+                        raw_error_signs[name] = None
+                        reversal_locks[name] = 0
                         x_predictor.reset(name)
                         continue
 
@@ -703,8 +787,11 @@ class CVTriggerComponent(BaseComponent):
                         pred_dx_from_center = pred_bullet_cx - cx
                         pred_dy_from_center = pred_bullet_cy - cy
 
-                        raw_dx = float(target_tx - pred_bullet_cx)
-                        raw_dy = float(target_ty - pred_bullet_cy)
+                        raw_dx, raw_dy = _raw_aim_error(
+                            target=(target_tx, target_ty),
+                            predicted_bullet=(pred_bullet_cx, pred_bullet_cy),
+                            body_y_axis_loose=bool(best_movement["body_y_axis_loose"]),
+                        )
 
                         if (
                             pred_dx_from_center != 0
@@ -721,6 +808,27 @@ class CVTriggerComponent(BaseComponent):
                             raw_dy = 0.0
 
                         dist = (raw_dx * raw_dx + raw_dy * raw_dy) ** 0.5
+                        limit_dx = float(best_movement["raw_err_x"])
+                        limit_dy = float(best_movement["raw_err_y"])
+                        limit_dist = (limit_dx * limit_dx + limit_dy * limit_dy) ** 0.5
+                        raw_sign = _raw_error_sign((limit_dx, limit_dy), jitter_deadzone_px)
+                        new_lock = _anti_oscillation_reversal_lock_frames(
+                            previous_sign=raw_error_signs.get(name),
+                            current_sign=raw_sign,
+                            distance_px=limit_dist,
+                            radius_px=anti_oscillation_radius_px,
+                            lock_frames=anti_oscillation_lock_frames,
+                        )
+                        if new_lock > 0:
+                            reversal_locks[name] = new_lock
+                        raw_error_signs[name] = raw_sign
+
+                        if reversal_locks.get(name, 0) > 0:
+                            reversal_locks[name] = max(0, reversal_locks[name] - 1)
+                            filtered_error[name] = None
+                            per_rule_smooth.pop(name, None)
+                            continue
+
                         prev = filtered_error.get(name)
                         if prev is None or dist >= near_smoothing_radius_px:
                             filt_dx = raw_dx
@@ -734,6 +842,10 @@ class CVTriggerComponent(BaseComponent):
                             filt_dx = 0.0
                         if abs(filt_dy) <= jitter_deadzone_px:
                             filt_dy = 0.0
+                        filt_dx, filt_dy = _lock_body_y_axis(
+                            (filt_dx, filt_dy),
+                            body_y_axis_loose=bool(best_movement["body_y_axis_loose"]),
+                        )
 
                         filtered_error[name] = (filt_dx, filt_dy)
                         if now >= aim_cooldown_until.get(name, 0.0):
@@ -744,6 +856,8 @@ class CVTriggerComponent(BaseComponent):
                                 "sens_mult_y": sens_mult_y,
                                 "dx": float(filt_dx),
                                 "dy": float(filt_dy),
+                                "limit_dx": limit_dx,
+                                "limit_dy": limit_dy,
                                 "d2": best_movement["d2"],
                                 "now": now,
                                 "aim_strength": aim_strength,
@@ -752,10 +866,15 @@ class CVTriggerComponent(BaseComponent):
                                 "curve_points": curve_points,
                                 "aim_smoothing_alpha": aim_smoothing_alpha,
                                 "noise_amount": noise_amount,
+                                "anti_oscillation_radius_px": anti_oscillation_radius_px,
+                                "anti_oscillation_reserve_counts": anti_oscillation_reserve_counts,
+                                "body_y_axis_loose": best_movement["body_y_axis_loose"],
                             })
                     else:
                         filtered_error[name] = None
                         per_rule_smooth.pop(name, None)
+                        raw_error_signs[name] = None
+                        reversal_locks[name] = 0
                         x_predictor.reset(name)
 
                     if best_click is not None:
@@ -787,6 +906,9 @@ class CVTriggerComponent(BaseComponent):
                         smoothing_alpha=m["aim_smoothing_alpha"],
                         per_rule_smooth=per_rule_smooth,
                     )
+                    error_px = _lock_body_y_axis(error_px, body_y_axis_loose=bool(m["body_y_axis_loose"]))
+                    if m["body_y_axis_loose"]:
+                        per_rule_smooth[m["name"]] = error_px
                     motion = aim_motion.compute_aim_motion(
                         error_px,
                         aim_motion.AimMotionConfig(
@@ -797,8 +919,17 @@ class CVTriggerComponent(BaseComponent):
                             sens_mult_y=m["sens_mult_y"],
                             noise_px=m["noise_amount"],
                             curve_points=m["curve_points"],
+                            anti_oscillation_radius_px=m["anti_oscillation_radius_px"],
+                            anti_oscillation_reserve_counts=m["anti_oscillation_reserve_counts"],
                         ),
+                        limit_error_px=(m["limit_dx"], m["limit_dy"]),
                     )
+                    if motion.arrived:
+                        per_rule_smooth.pop(m["name"], None)
+                        filtered_error[m["name"]] = None
+                        raw_error_signs[m["name"]] = None
+                        reversal_locks[m["name"]] = 0
+                        x_predictor.reset(m["name"])
                     mdx = motion.dx
                     mdy = motion.dy
                     if mdx or mdy:

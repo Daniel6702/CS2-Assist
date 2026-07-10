@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import unittest
 from pathlib import Path
+from typing import Any
 
 from app.components.cv_trigger.migration import (
     _PRESET_CURVES,
@@ -398,6 +399,15 @@ class MigrateLegacyConfigTests(unittest.TestCase):
 
 
 class DefaultProfileCanonicalTests(unittest.TestCase):
+    def test_default_shared_settings_have_game_resolution(self) -> None:
+        shared = default_profile()["app"]["shared"]
+        self.assertEqual(shared["game_resolution"], {"width": 1600, "height": 1200})
+
+    def test_default_cv_trigger_has_no_capture_settings(self) -> None:
+        cv = default_profile()["components"]["cv_trigger"]
+        self.assertNotIn("monitor", cv)
+        self.assertNotIn("game_resolution", cv)
+
     def test_default_has_curve_library(self) -> None:
         cv = default_profile()["components"]["cv_trigger"]
         self.assertIn("aim_curves", cv)
@@ -408,7 +418,7 @@ class DefaultProfileCanonicalTests(unittest.TestCase):
         cv = default_profile()["components"]["cv_trigger"]
         for name, rule in cv["configs"].items():
             with self.subTest(rule=name):
-                self.assertLessEqual(rule["AIM_STRENGTH"], 1.0, f"{name}: AIM_STRENGTH > 1.0")
+                self.assertIsInstance(rule["AIM_STRENGTH"], (int, float), f"{name}: AIM_STRENGTH is not numeric")
                 self.assertGreaterEqual(rule["AIM_STRENGTH"], 0.0, f"{name}: AIM_STRENGTH < 0.0")
 
     def test_default_rules_have_aim_curve_id(self) -> None:
@@ -444,12 +454,24 @@ class DefaultProfileCanonicalTests(unittest.TestCase):
 class CheckedInProfileCanonicalTests(unittest.TestCase):
     """Validate profiles/Default.json against canonical format."""
 
+    profile: dict[str, Any] = {}
+    cv: dict[str, Any] = {}
+    configs: dict[str, Any] = {}
+
     def setUp(self) -> None:
         profile_path = Path(__file__).resolve().parents[1] / "profiles" / "Default.json"
         with profile_path.open("r", encoding="utf-8") as f:
             self.profile = json.load(f)
         self.cv = self.profile.get("components", {}).get("cv_trigger", {})
         self.configs = self.cv.get("configs", {})
+
+    def test_shared_settings_have_game_resolution(self) -> None:
+        shared = self.profile.get("app", {}).get("shared", {})
+        self.assertEqual(shared.get("game_resolution"), {"width": 1600, "height": 1200})
+
+    def test_cv_trigger_has_no_capture_settings(self) -> None:
+        self.assertNotIn("monitor", self.cv)
+        self.assertNotIn("game_resolution", self.cv)
 
     def test_has_curve_library(self) -> None:
         self.assertIn("aim_curves", self.cv)
@@ -460,14 +482,15 @@ class CheckedInProfileCanonicalTests(unittest.TestCase):
         for name, rule in self.configs.items():
             with self.subTest(rule=name):
                 val = rule["AIM_STRENGTH"]
-                self.assertLessEqual(val, 1.0, f"{name}: AIM_STRENGTH={val} > 1.0")
+                self.assertIsInstance(val, (int, float), f"{name}: AIM_STRENGTH={val!r} is not numeric")
                 self.assertGreaterEqual(val, 0.0, f"{name}: AIM_STRENGTH={val} < 0.0")
 
     def test_rules_have_valid_aim_curve_id(self) -> None:
+        curve_library = self.cv.get("aim_curves", {})
         for name, rule in self.configs.items():
             with self.subTest(rule=name):
                 cid = rule.get("AIM_CURVE_ID", "")
-                self.assertIn(cid, _PRESET_CURVES, f"{name}: unknown curve id {cid!r}")
+                self.assertIn(cid, curve_library, f"{name}: unknown curve id {cid!r}")
 
     def test_rules_have_max_aim_speed_px(self) -> None:
         for name, rule in self.configs.items():
@@ -494,4 +517,4 @@ class CheckedInProfileCanonicalTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

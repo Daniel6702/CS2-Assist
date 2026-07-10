@@ -2,12 +2,11 @@ import unittest
 
 from app.components.cv_trigger.aim_motion import (
     AimMotionConfig,
-    AimMotionResult,
     compute_aim_motion,
     interpolate_curve,
 )
 
-LINEAR_CURVE = [(0.0, 0.0), (0.5, 0.5), (1.0, 1.0)]
+LINEAR_CURVE: list[tuple[float, float]] = [(0.0, 0.0), (0.5, 0.5), (1.0, 1.0)]
 
 
 class AimMotionCurveInvariantTests(unittest.TestCase):
@@ -15,15 +14,28 @@ class AimMotionCurveInvariantTests(unittest.TestCase):
 
     # Helper ----------------------------------------------------------------
 
-    def _cfg(self, aim_strength: float = 1.0, **kw: object) -> AimMotionConfig:
+    def _cfg(
+        self,
+        aim_strength: float = 1.0,
+        snap_distance: int = 200,
+        max_aim_speed_px: int = 100,
+        sens_mult_x: float = 1.0,
+        sens_mult_y: float = 1.0,
+        noise_px: float = 0.0,
+        curve_points: list[tuple[float, float]] | None = None,
+        anti_oscillation_radius_px: float = 0.0,
+        anti_oscillation_reserve_counts: int = 0,
+    ) -> AimMotionConfig:
         return AimMotionConfig(
             aim_strength=aim_strength,
-            snap_distance=int(kw.get("snap_distance", 200)),
-            max_aim_speed_px=int(kw.get("max_aim_speed_px", 100)),
-            sens_mult_x=float(kw.get("sens_mult_x", 1.0)),
-            sens_mult_y=float(kw.get("sens_mult_y", 1.0)),
-            noise_px=float(kw.get("noise_px", 0.0)),
-            curve_points=list(kw.get("curve_points", LINEAR_CURVE)),
+            snap_distance=snap_distance,
+            max_aim_speed_px=max_aim_speed_px,
+            sens_mult_x=sens_mult_x,
+            sens_mult_y=sens_mult_y,
+            noise_px=noise_px,
+            curve_points=list(LINEAR_CURVE if curve_points is None else curve_points),
+            anti_oscillation_radius_px=anti_oscillation_radius_px,
+            anti_oscillation_reserve_counts=anti_oscillation_reserve_counts,
         )
 
     # 1. Curve interpolation clamps x outside [0,1] -------------------------
@@ -186,6 +198,89 @@ class AimMotionCurveInvariantTests(unittest.TestCase):
             self.assertLessEqual(abs(r.dx), max(1, abs(round(ex))))
             self.assertLessEqual(abs(r.dy), max(1, abs(round(ey))))
 
+    def test_raw_limit_rejects_stale_smoothed_direction(self) -> None:
+        r = compute_aim_motion(
+            (40.0, 0.0),
+            self._cfg(aim_strength=10.0, max_aim_speed_px=100),
+            limit_error_px=(-3.0, 0.0),
+        )
+
+        self.assertEqual(r.dx, 0)
+        self.assertEqual(r.dy, 0)
+
+    def test_raw_limit_uses_floor_not_round_near_target(self) -> None:
+        r = compute_aim_motion(
+            (50.0, 0.0),
+            self._cfg(aim_strength=10.0, max_aim_speed_px=100, sens_mult_x=1.0),
+            limit_error_px=(0.9, 0.0),
+        )
+
+        self.assertEqual(r.dx, 0)
+        self.assertTrue(r.arrived)
+
+    def test_raw_limit_caps_aggressive_curve_without_slowing_safe_steps(self) -> None:
+        cfg = self._cfg(
+            aim_strength=100.0,
+            max_aim_speed_px=1000,
+            curve_points=[(0.0, 1.0), (1.0, 1.0)],
+        )
+
+        safe = compute_aim_motion((50.0, 0.0), cfg, limit_error_px=(25.0, 0.0))
+        capped = compute_aim_motion((50.0, 0.0), cfg, limit_error_px=(7.0, 0.0))
+
+        self.assertEqual(safe.dx, 25)
+        self.assertEqual(capped.dx, 7)
+
+    def test_closed_loop_raw_limiter_never_crosses_target(self) -> None:
+        cfg = self._cfg(
+            aim_strength=100.0,
+            max_aim_speed_px=1000,
+            noise_px=20.0,
+            curve_points=[(0.0, 1.0), (1.0, 1.0)],
+        )
+        error = 6.4
+
+        for _ in range(20):
+            previous = error
+            r = compute_aim_motion(
+                (50.0, 0.0),
+                cfg,
+                noise_rng=lambda lo, hi: hi,
+                limit_error_px=(error, 0.0),
+            )
+            error -= r.dx
+            self.assertGreaterEqual(previous * error, 0.0)
+            self.assertLessEqual(abs(error), abs(previous))
+
+        self.assertGreaterEqual(error, 0.0)
+
+    def test_anti_oscillation_reserve_leaves_near_target_count_margin(self) -> None:
+        cfg = self._cfg(
+            aim_strength=100.0,
+            max_aim_speed_px=1000,
+            curve_points=[(0.0, 1.0), (1.0, 1.0)],
+            anti_oscillation_radius_px=24.0,
+            anti_oscillation_reserve_counts=1,
+        )
+
+        r = compute_aim_motion((50.0, 0.0), cfg, limit_error_px=(6.0, 0.0))
+
+        self.assertEqual(r.dx, 5)
+        self.assertFalse(r.arrived)
+
+    def test_anti_oscillation_reserve_does_not_slow_far_target_steps(self) -> None:
+        cfg = self._cfg(
+            aim_strength=100.0,
+            max_aim_speed_px=1000,
+            curve_points=[(0.0, 1.0), (1.0, 1.0)],
+            anti_oscillation_radius_px=24.0,
+            anti_oscillation_reserve_counts=1,
+        )
+
+        r = compute_aim_motion((50.0, 0.0), cfg, limit_error_px=(40.0, 0.0))
+
+        self.assertEqual(r.dx, 40)
+
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()
