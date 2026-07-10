@@ -620,6 +620,15 @@ class CVTriggerComponent(BaseComponent):
                     self._set_overlay_state(False)
                     continue
 
+                # Detect manual left-click and apply aim cooldown to all active rules
+                if activation.consume_button_press("left"):
+                    _now = time.time()
+                    for name in active_names:
+                        cfg = enabled_configs[name]
+                        aim_cd_ms = float(cfg.get("auto_shoot_aim_cooldown_ms", 0))
+                        if aim_cd_ms > 0:
+                            aim_cooldown_until[name] = _now + aim_cd_ms / 1000.0
+
                 try:
                     result = next(
                         iter(

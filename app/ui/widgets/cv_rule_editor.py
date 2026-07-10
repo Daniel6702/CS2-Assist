@@ -223,6 +223,16 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.spray_target_offset_enabled.stateChanged.connect(self._emit_change)
         targeting_form.addRow("Use recoil spray offset", self.spray_target_offset_enabled)
 
+        self.auto_shoot_aim_cooldown_ms = QtWidgets.QSpinBox()
+        self.auto_shoot_aim_cooldown_ms.setRange(0, 5000)
+        self.auto_shoot_aim_cooldown_ms.setSuffix(" ms")
+        self.auto_shoot_aim_cooldown_ms.setToolTip(
+            "After an auto shot or manual click, disable aim assist (mouse movement) "
+            "for this rule for this many ms.  0 = disabled."
+        )
+        self.auto_shoot_aim_cooldown_ms.valueChanged.connect(self._emit_change)
+        targeting_form.addRow("Aim assist cooldown", self.auto_shoot_aim_cooldown_ms)
+
         timing_group = QtWidgets.QGroupBox("Auto Shoot")
         timing_layout = QtWidgets.QHBoxLayout(timing_group)
         timing_layout.setContentsMargins(8, 8, 8, 8)
@@ -317,16 +327,6 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.cooldown_ms.setRange(0, 5000)
         self.cooldown_ms.valueChanged.connect(self._emit_change)
         timing_form.addRow("Cooldown ms", self.cooldown_ms)
-
-        self.auto_shoot_aim_cooldown_ms = QtWidgets.QSpinBox()
-        self.auto_shoot_aim_cooldown_ms.setRange(0, 5000)
-        self.auto_shoot_aim_cooldown_ms.setSuffix(" ms")
-        self.auto_shoot_aim_cooldown_ms.setToolTip(
-            "After an auto shot, disable aim assist (mouse movement) "
-            "for this rule for this many ms.  0 = disabled."
-        )
-        self.auto_shoot_aim_cooldown_ms.valueChanged.connect(self._emit_change)
-        timing_form.addRow("Aim assist cooldown", self.auto_shoot_aim_cooldown_ms)
 
         self.cross_x_thresh = QtWidgets.QSpinBox()
         self.cross_x_thresh.setRange(0, 2000)

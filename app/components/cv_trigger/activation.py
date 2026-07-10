@@ -67,6 +67,7 @@ class ActivationState:
         self._lock = threading.RLock()
         self._held_keys: set[str] = set()
         self._held_buttons: set[str] = set()
+        self._button_just_pressed: set[str] = set()
 
     def press_key(self, name: str | None) -> None:
         if not name:
@@ -84,13 +85,25 @@ class ActivationState:
         if not name:
             return
         with self._lock:
-            self._held_buttons.add(name)
+            canon = canonical_button_name(name)
+            self._held_buttons.add(canon)
+            self._button_just_pressed.add(canon)
 
     def release_button(self, name: str | None) -> None:
         if not name:
             return
         with self._lock:
-            self._held_buttons.discard(name)
+            self._held_buttons.discard(canonical_button_name(name))
+
+    def consume_button_press(self, name: str) -> bool:
+        """Returns True if *name* was just pressed since the last call, clearing the flag.
+        This allows detecting a single press event (transition) rather than polling held state."""
+        with self._lock:
+            canon = canonical_button_name(name)
+            if canon in self._button_just_pressed:
+                self._button_just_pressed.discard(canon)
+                return True
+            return False
 
     def is_active(self, activation: dict[str, Any]) -> bool:
         device = str(activation.get("device", "keyboard")).strip().lower()

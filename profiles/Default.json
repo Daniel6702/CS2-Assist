@@ -255,6 +255,19 @@
                         ]
                     ]
                 },
+                "pistol": {
+                    "label": "Pistol",
+                    "points": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            1.0,
+                            0.0
+                        ]
+                    ]
+                },
                 "rifle": {
                     "label": "Rifle",
                     "points": [
@@ -351,21 +364,21 @@
                     "target_type": "both"
                 },
                 "USP": {
-                    "AIM_CURVE_ID": "rifle",
+                    "AIM_CURVE_ID": "pistol",
                     "AIM_MODE": "head",
-                    "AIM_STRENGTH": 3.0,
+                    "AIM_STRENGTH": 0.5,
                     "BODY_KNEE_OFFSET": 0.5,
                     "CLICK_HOLD_MS": 15,
-                    "COOLDOWN_MS": 350,
-                    "CROSS_X_THRESH": 12,
+                    "COOLDOWN_MS": 150,
+                    "CROSS_X_THRESH": 30,
                     "CROSS_Y_THRESH_BOT": 32,
-                    "CROSS_Y_THRESH_TOP": 18,
-                    "HEAD_OFFSET": 0.12,
-                    "MAX_AIM_SPEED_PX": 80,
+                    "CROSS_Y_THRESH_TOP": 30,
+                    "HEAD_OFFSET": 0.14,
+                    "MAX_AIM_SPEED_PX": 35,
                     "NOISE_AMOUNT": 0.0,
-                    "SETTLE_FRAMES": 1,
-                    "SMOOTHING_ALPHA": 0.2,
-                    "SNAP_DISTANCE": 50,
+                    "SETTLE_FRAMES": 0,
+                    "SMOOTHING_ALPHA": 0.5,
+                    "SNAP_DISTANCE": 100,
                     "activation": {
                         "mode": "always"
                     },
@@ -373,36 +386,8 @@
                         "weapon_usp_silencer"
                     ],
                     "auto_shoot": false,
-                    "auto_shoot_aim_cooldown_ms": 0,
+                    "auto_shoot_aim_cooldown_ms": 80,
                     "enabled": true,
-                    "only_when_scoped_visual": false,
-                    "priority": 0,
-                    "spray_target_offset_enabled": false,
-                    "target_type": "both"
-                },
-                "trigger": {
-                    "AIM_CURVE_ID": "linear",
-                    "AIM_MODE": "head",
-                    "AIM_STRENGTH": 0.0,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "CLICK_HOLD_MS": 1,
-                    "COOLDOWN_MS": 300,
-                    "CROSS_X_THRESH": 25,
-                    "CROSS_Y_THRESH_BOT": 40,
-                    "CROSS_Y_THRESH_TOP": 40,
-                    "HEAD_OFFSET": 0.12,
-                    "MAX_AIM_SPEED_PX": 50,
-                    "NOISE_AMOUNT": 0.0,
-                    "SETTLE_FRAMES": 0,
-                    "SMOOTHING_ALPHA": 0.0,
-                    "SNAP_DISTANCE": 18,
-                    "activation": {
-                        "device": "keyboard",
-                        "key": "alt"
-                    },
-                    "auto_shoot": true,
-                    "auto_shoot_aim_cooldown_ms": 0,
-                    "enabled": false,
                     "only_when_scoped_visual": false,
                     "priority": 0,
                     "spray_target_offset_enabled": false,
