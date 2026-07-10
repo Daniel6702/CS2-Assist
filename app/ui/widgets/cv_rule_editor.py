@@ -4,6 +4,18 @@ from typing import Any
 
 from PySide6 import QtCore, QtWidgets
 
+from app.components.cv_trigger.curve_config import legacy_response_curve_to_id
+
+
+_LEGACY_RULE_KEYS = {
+    "RESPONSE_CURVE",
+    "CURVE_INTENSITY",
+    "CONSTANT_SPEED_PX",
+    "ACCEL_BOOST",
+    "ANTI_OVERSHOOT",
+    "SENS_COEFF",
+}
+
 
 def _infer_target_type_from_rule_ui(item: dict[str, Any]) -> str:
     target_type = str(item.get("target_type", "") or "").strip().lower()
@@ -24,6 +36,13 @@ def _infer_target_type_from_rule_ui(item: dict[str, Any]) -> str:
     if has_type2:
         return "type2"
     return "type1"
+
+
+def _scalar_aim_strength(value: Any, legacy_percent: bool) -> float:
+    strength = float(value)
+    if legacy_percent and strength > 1.0:
+        return strength / 100.0
+    return strength
 
 
 class CVRuleEditor(QtWidgets.QFrame):
@@ -48,11 +67,8 @@ class CVRuleEditor(QtWidgets.QFrame):
         "CLICK_HOLD_MS",
         "COOLDOWN_MS",
         "AIM_STRENGTH",
-        "RESPONSE_CURVE",
-        "CURVE_INTENSITY",
-        "CONSTANT_SPEED_PX",
-        "ACCEL_BOOST",
-        "ANTI_OVERSHOOT",
+        "AIM_CURVE_ID",
+        "MAX_AIM_SPEED_PX",
         "SMOOTHING_ALPHA",
         "NOISE_AMOUNT",
         "CROSS_X_THRESH",
@@ -66,6 +82,7 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.setObjectName("cvRuleEditor")
         self.setStyleSheet("QFrame#cvRuleEditor { border: 1px solid #bbb; border-radius: 6px; }")
         self._suspend = False
+        self._available_curves: dict[str, str] = {"linear": "Linear"}
 
         outer = QtWidgets.QVBoxLayout(self)
         outer.setContentsMargins(8, 8, 8, 8)
@@ -222,10 +239,9 @@ class CVRuleEditor(QtWidgets.QFrame):
 
         self.aim_strength = QtWidgets.QDoubleSpinBox()
         self.aim_strength.setRange(0.0, 100.0)
-        self.aim_strength.setDecimals(1)
-        self.aim_strength.setSingleStep(1.0)
-        self.aim_strength.setSuffix("%")
-        self.aim_strength.setToolTip("Overall aim assist power.  0 = off, 50 = moderate, 100 = full.")
+        self.aim_strength.setDecimals(3)
+        self.aim_strength.setSingleStep(0.1)
+        self.aim_strength.setToolTip("Scalar aim assist power. 0 = off, 0.5 = moderate, 1.0 = full, values above 1 increase speed.")
         self.aim_strength.valueChanged.connect(self._emit_change)
         aim_tuning_form.addRow("Aim Strength", self.aim_strength)
 
@@ -236,56 +252,18 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.snap_distance.valueChanged.connect(self._emit_change)
         aim_tuning_form.addRow("Snap Distance", self.snap_distance)
 
-        self.response_curve = QtWidgets.QComboBox()
-        self.response_curve.addItem("Proportional", "proportional")
-        self.response_curve.addItem("Constant", "constant")
-        self.response_curve.addItem("Accelerating", "accelerating")
-        self.response_curve.addItem("Exponential", "exponential")
-        self.response_curve.currentIndexChanged.connect(self._update_curve_visibility)
-        self.response_curve.currentIndexChanged.connect(self._emit_change)
-        aim_tuning_form.addRow("Response Curve", self.response_curve)
+        self.aim_curve_id = QtWidgets.QComboBox()
+        self.aim_curve_id.setToolTip("Named curve from the global Aim Motion Curves library.")
+        self.aim_curve_id.currentIndexChanged.connect(self._emit_change)
+        aim_tuning_form.addRow("Aim Curve", self.aim_curve_id)
+        self._rebuild_curve_selector("linear")
 
-        self.curve_intensity = QtWidgets.QDoubleSpinBox()
-        self.curve_intensity.setRange(0.1, 5.0)
-        self.curve_intensity.setDecimals(2)
-        self.curve_intensity.setSingleStep(0.1)
-        self.curve_intensity.setToolTip(
-            "Shape control for Proportional / Exponential curves.\n"
-            "< 1: more movement near the target (finer at distance)\n"
-            "> 1: more movement at distance (finer near target)"
-        )
-        self.curve_intensity.valueChanged.connect(self._emit_change)
-        aim_tuning_form.addRow("Curve Intensity", self.curve_intensity)
-        self.curve_intensity_label = aim_tuning_form.labelForField(self.curve_intensity)
-
-        self.constant_speed_px = QtWidgets.QSpinBox()
-        self.constant_speed_px.setRange(0, 500)
-        self.constant_speed_px.setSuffix(" px")
-        self.constant_speed_px.setToolTip("Fixed pixel speed per frame for Constant curve mode.")
-        self.constant_speed_px.valueChanged.connect(self._emit_change)
-        aim_tuning_form.addRow("Constant Speed", self.constant_speed_px)
-        self.constant_speed_px_label = aim_tuning_form.labelForField(self.constant_speed_px)
-
-        self.accel_boost = QtWidgets.QDoubleSpinBox()
-        self.accel_boost.setRange(0.5, 5.0)
-        self.accel_boost.setDecimals(2)
-        self.accel_boost.setSingleStep(0.1)
-        self.accel_boost.setToolTip(
-            "How dramatically speed increases near the target for Accelerating curve.\n"
-            "Higher = more aggressive speed-up as crosshair approaches target."
-        )
-        self.accel_boost.valueChanged.connect(self._emit_change)
-        aim_tuning_form.addRow("Accel Boost", self.accel_boost)
-        self.accel_boost_label = aim_tuning_form.labelForField(self.accel_boost)
-
-        self.anti_overshoot = QtWidgets.QCheckBox()
-        self.anti_overshoot.setChecked(True)
-        self.anti_overshoot.setToolTip(
-            "Guarantees the crosshair never crosses past the target.\n"
-            "Keep enabled to prevent oscillation around the target."
-        )
-        self.anti_overshoot.stateChanged.connect(self._emit_change)
-        aim_tuning_form.addRow("Anti-overshoot", self.anti_overshoot)
+        self.max_aim_speed_px = QtWidgets.QSpinBox()
+        self.max_aim_speed_px.setRange(0, 5000)
+        self.max_aim_speed_px.setSuffix(" px")
+        self.max_aim_speed_px.setToolTip("Maximum movement speed before the selected curve and strength scaling are applied.")
+        self.max_aim_speed_px.valueChanged.connect(self._emit_change)
+        aim_tuning_form.addRow("Max Aim Speed", self.max_aim_speed_px)
 
         self.smoothing_alpha = QtWidgets.QDoubleSpinBox()
         self.smoothing_alpha.setRange(0.0, 1.0)
@@ -364,7 +342,6 @@ class CVRuleEditor(QtWidgets.QFrame):
             checkbox.setMinimumHeight(input_row_height)
 
         self._update_activation_visibility()
-        self._update_curve_visibility()
         self._update_summary()
 
     def _toggle_expanded(self, checked: bool) -> None:
@@ -384,17 +361,37 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.activation_button_label.setVisible(mode == "mouse")
         self._update_summary()
 
-    def _update_curve_visibility(self) -> None:
-        curve = str(self.response_curve.currentData() or "proportional")
-        show_intensity = curve in ("proportional", "exponential")
-        show_constant = curve == "constant"
-        show_accel = curve == "accelerating"
-        self.curve_intensity.setVisible(show_intensity)
-        self.curve_intensity_label.setVisible(show_intensity)
-        self.constant_speed_px.setVisible(show_constant)
-        self.constant_speed_px_label.setVisible(show_constant)
-        self.accel_boost.setVisible(show_accel)
-        self.accel_boost_label.setVisible(show_accel)
+    def set_available_curves(self, curves: dict[str, Any]) -> None:
+        current = str(self.aim_curve_id.currentData() or self.aim_curve_id.currentText() or "linear")
+        labels: dict[str, str] = {}
+        for curve_id, curve in curves.items():
+            if not isinstance(curve_id, str) or not curve_id.strip():
+                continue
+            label = curve_id
+            if isinstance(curve, dict):
+                label = str(curve.get("label", curve_id) or curve_id)
+            labels[curve_id] = label
+        if not labels:
+            labels = {"linear": "Linear"}
+        self._available_curves = labels
+        self._rebuild_curve_selector(current)
+
+    def _rebuild_curve_selector(self, selected_curve_id: str) -> None:
+        was_suspended = self._suspend
+        self._suspend = True
+        try:
+            self.aim_curve_id.clear()
+            for curve_id, label in self._available_curves.items():
+                self.aim_curve_id.addItem(label, curve_id)
+            self._set_curve_selection(selected_curve_id)
+        finally:
+            self._suspend = was_suspended
+
+    def _set_curve_selection(self, curve_id: str) -> None:
+        idx = self.aim_curve_id.findData(curve_id)
+        if idx < 0:
+            idx = self.aim_curve_id.findData("linear")
+        self.aim_curve_id.setCurrentIndex(idx if idx >= 0 else 0)
 
     def _target_type_value(self) -> str:
         return str(self.target_type.currentData() or "both")
@@ -462,15 +459,13 @@ class CVRuleEditor(QtWidgets.QFrame):
             self.click_hold_ms.setValue(int(data.get("CLICK_HOLD_MS", 15)))
             self.cooldown_ms.setValue(int(data.get("COOLDOWN_MS", 250)))
             self.auto_shoot_aim_cooldown_ms.setValue(int(data.get("auto_shoot_aim_cooldown_ms", 0)))
-            self.aim_strength.setValue(float(data.get("AIM_STRENGTH", data.get("SENS_COEFF", 50.0))))
+            canonical_shape = "AIM_CURVE_ID" in data or "MAX_AIM_SPEED_PX" in data
+            legacy_percent = (not canonical_shape) or bool(_LEGACY_RULE_KEYS & set(data))
+            self.aim_strength.setValue(_scalar_aim_strength(data.get("AIM_STRENGTH", data.get("SENS_COEFF", 0.5)), legacy_percent))
             self.snap_distance.setValue(int(data.get("SNAP_DISTANCE", 200)))
-            curve_val = str(data.get("RESPONSE_CURVE", "proportional"))
-            curve_idx = self.response_curve.findData(curve_val)
-            self.response_curve.setCurrentIndex(curve_idx if curve_idx >= 0 else self.response_curve.findData("proportional"))
-            self.curve_intensity.setValue(float(data.get("CURVE_INTENSITY", 1.0)))
-            self.constant_speed_px.setValue(int(data.get("CONSTANT_SPEED_PX", 50)))
-            self.accel_boost.setValue(float(data.get("ACCEL_BOOST", 1.0)))
-            self.anti_overshoot.setChecked(bool(data.get("ANTI_OVERSHOOT", True)))
+            curve_id = str(data.get("AIM_CURVE_ID", legacy_response_curve_to_id(data.get("RESPONSE_CURVE"))))
+            self._set_curve_selection(curve_id)
+            self.max_aim_speed_px.setValue(int(data.get("MAX_AIM_SPEED_PX", data.get("CONSTANT_SPEED_PX", 50))))
             self.smoothing_alpha.setValue(float(data.get("SMOOTHING_ALPHA", 0.0)))
             self.noise_amount.setValue(float(data.get("NOISE_AMOUNT", 0.0)))
             self.cross_x_thresh.setValue(int(data.get("CROSS_X_THRESH", 14)))
@@ -478,7 +473,6 @@ class CVRuleEditor(QtWidgets.QFrame):
             self.cross_y_bot.setValue(int(data.get("CROSS_Y_THRESH_BOT", 32)))
             self._sync_header_title()
             self._update_activation_visibility()
-            self._update_curve_visibility()
         finally:
             self._suspend = False
             self._update_summary()
@@ -519,11 +513,8 @@ class CVRuleEditor(QtWidgets.QFrame):
         data["auto_shoot_aim_cooldown_ms"] = self.auto_shoot_aim_cooldown_ms.value()
         data["AIM_STRENGTH"] = self.aim_strength.value()
         data["SNAP_DISTANCE"] = self.snap_distance.value()
-        data["RESPONSE_CURVE"] = str(self.response_curve.currentData() or "proportional")
-        data["CURVE_INTENSITY"] = self.curve_intensity.value()
-        data["CONSTANT_SPEED_PX"] = self.constant_speed_px.value()
-        data["ACCEL_BOOST"] = self.accel_boost.value()
-        data["ANTI_OVERSHOOT"] = self.anti_overshoot.isChecked()
+        data["AIM_CURVE_ID"] = str(self.aim_curve_id.currentData() or "linear")
+        data["MAX_AIM_SPEED_PX"] = self.max_aim_speed_px.value()
         data["SMOOTHING_ALPHA"] = self.smoothing_alpha.value()
         data["NOISE_AMOUNT"] = self.noise_amount.value()
         data.pop("SENS_COEFF", None)

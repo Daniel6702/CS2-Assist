@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from app.components.cv_trigger.curve_config import build_curve_library
+
 APP_ROOT = Path(__file__).resolve().parents[1]
 RESOURCES_DIR = APP_ROOT / "resources"
 PROFILES_DIR = APP_ROOT / "profiles"
@@ -117,6 +119,7 @@ def default_profile() -> dict[str, Any]:
                 "model_path": str(MODEL_FILE),
                 "monitor": {"top": 0, "left": 0, "width": 2560, "height": 1440},
                 "game_resolution": {"width": 1600, "height": 1200},
+                "aim_curves": build_curve_library(),
                 "configs": {
                     "rifle_alt_aim_only": {
                         "enabled": True,
@@ -138,12 +141,9 @@ def default_profile() -> dict[str, Any]:
                         "SETTLE_FRAMES": 2,
                         "CLICK_HOLD_MS": 20,
                         "COOLDOWN_MS": 350,
-                        "AIM_STRENGTH": 50.0,
-                        "RESPONSE_CURVE": "proportional",
-                        "CURVE_INTENSITY": 1.0,
-                        "CONSTANT_SPEED_PX": 50,
-                        "ACCEL_BOOST": 1.0,
-                        "ANTI_OVERSHOOT": True,
+                        "AIM_STRENGTH": 0.5,
+                        "AIM_CURVE_ID": "linear",
+                        "MAX_AIM_SPEED_PX": 50,
                         "SMOOTHING_ALPHA": 0.0,
                         "NOISE_AMOUNT": 0.0,
                         "BODY_KNEE_OFFSET": 0.50,
@@ -163,12 +163,9 @@ def default_profile() -> dict[str, Any]:
                         "SETTLE_FRAMES": 1,
                         "CLICK_HOLD_MS": 25,
                         "COOLDOWN_MS": 500,
-                        "AIM_STRENGTH": 20.0,
-                        "RESPONSE_CURVE": "proportional",
-                        "CURVE_INTENSITY": 1.5,
-                        "CONSTANT_SPEED_PX": 30,
-                        "ACCEL_BOOST": 1.0,
-                        "ANTI_OVERSHOOT": True,
+                        "AIM_STRENGTH": 0.2,
+                        "AIM_CURVE_ID": "linear",
+                        "MAX_AIM_SPEED_PX": 30,
                         "SMOOTHING_ALPHA": 0.0,
                         "NOISE_AMOUNT": 0.0,
                         "BODY_KNEE_OFFSET": 0.50,

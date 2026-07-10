@@ -6,6 +6,8 @@ from PySide6 import QtCore, QtWidgets
 
 from app.device_service import DeviceService
 
+from .curve_editor import AimCurveEditor, load_curves
+
 from .cv_rule_editor import CVRuleEditor, _infer_target_type_from_rule_ui
 
 
@@ -26,6 +28,8 @@ def _normalize_cv_trigger_config_for_ui(config: dict[str, Any]) -> dict[str, Any
 
     cfg.setdefault("use_gsi_opponent_side", False)
     cfg.setdefault("manual_target_side", "both")
+
+    cfg["aim_curves"] = load_curves(cfg.get("aim_curves"))
 
     normalized_configs: dict[str, Any] = {}
     for raw_name, raw_item in dict(cfg.get("configs", {})).items():
@@ -254,6 +258,15 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         self.x_prediction_max_delta_px.valueChanged.connect(self._emit_change)
         prediction_form.addRow("Max predicted X shift (px)", self.x_prediction_max_delta_px)
 
+        aim_curve_group = QtWidgets.QGroupBox("Aim Motion Curves")
+        aim_curve_layout = QtWidgets.QVBoxLayout(aim_curve_group)
+        aim_curve_layout.setContentsMargins(8, 8, 8, 8)
+        self.aim_curve_editor = AimCurveEditor()
+        self.aim_curve_editor.changed.connect(self._sync_rule_curve_options)
+        self.aim_curve_editor.changed.connect(self._emit_change)
+        aim_curve_layout.addWidget(self.aim_curve_editor)
+        outer.addWidget(aim_curve_group)
+
         rule_header = QtWidgets.QHBoxLayout()
         label_col = QtWidgets.QVBoxLayout()
         title_lbl = QtWidgets.QLabel("Rules / configs")
@@ -321,6 +334,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
             self.x_prediction_history_ms.setValue(float(data.get("x_prediction_history_ms", 90.0) or 90.0))
             self.x_prediction_damping.setValue(float(data.get("x_prediction_damping", 0.35) or 0.35))
             self.x_prediction_max_delta_px.setValue(float(data.get("x_prediction_max_delta_px", 36.0) or 36.0))
+            self.aim_curve_editor.load_curves(load_curves(data.get("aim_curves")))
             self._clear_rules()
             configs = dict(data.get("configs", {}))
             for name, rule in configs.items():
@@ -339,13 +353,10 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
                         "SETTLE_FRAMES": 2,
                         "CLICK_HOLD_MS": 15,
                         "COOLDOWN_MS": 250,
-                        "AIM_STRENGTH": 60.0,
+                        "AIM_STRENGTH": 0.6,
                         "SNAP_DISTANCE": 200,
-                        "RESPONSE_CURVE": "proportional",
-                        "CURVE_INTENSITY": 1.0,
-                        "CONSTANT_SPEED_PX": 50,
-                        "ACCEL_BOOST": 1.0,
-                        "ANTI_OVERSHOOT": True,
+                        "AIM_CURVE_ID": "linear",
+                        "MAX_AIM_SPEED_PX": 50,
                         "SMOOTHING_ALPHA": 0.0,
                         "NOISE_AMOUNT": 0.0,
                         "CROSS_X_THRESH": 14,
@@ -397,6 +408,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
             final_name = base_name if count == 0 else f"{base_name}_{count + 1}"
             rules[final_name] = rule
         config["configs"] = rules
+        config["aim_curves"] = self.aim_curve_editor.extract_curves()
         return config
 
     def _clear_rules(self) -> None:
@@ -420,13 +432,10 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
                 "SETTLE_FRAMES": 2,
                 "CLICK_HOLD_MS": 15,
                 "COOLDOWN_MS": 250,
-                "AIM_STRENGTH": 60.0,
+                "AIM_STRENGTH": 0.6,
                 "SNAP_DISTANCE": 200,
-                "RESPONSE_CURVE": "proportional",
-                "CURVE_INTENSITY": 1.0,
-                "CONSTANT_SPEED_PX": 50,
-                "ACCEL_BOOST": 1.0,
-                "ANTI_OVERSHOOT": True,
+                "AIM_CURVE_ID": "linear",
+                "MAX_AIM_SPEED_PX": 50,
                 "SMOOTHING_ALPHA": 0.0,
                 "NOISE_AMOUNT": 0.0,
                 "CROSS_X_THRESH": 14,
@@ -437,6 +446,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
 
     def _add_rule_editor(self, name: str, rule: dict[str, Any], emit_change: bool = True) -> None:
         editor = CVRuleEditor()
+        editor.set_available_curves(self.aim_curve_editor.extract_curves())
         editor.load_rule(name, rule)
         editor.changed.connect(self._emit_change)
         editor.remove_requested.connect(self._remove_rule_editor)
@@ -456,6 +466,11 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
     def _on_add_rule_clicked(self) -> None:
         name, rule = self._default_rule_payload()
         self._add_rule_editor(name, rule, emit_change=True)
+
+    def _sync_rule_curve_options(self) -> None:
+        curves = self.aim_curve_editor.extract_curves()
+        for editor in self.rule_editors:
+            editor.set_available_curves(curves)
 
     def _emit_change(self, *args) -> None:
         if self._suspend:

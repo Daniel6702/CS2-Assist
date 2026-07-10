@@ -2,12 +2,89 @@ from __future__ import annotations
 
 from typing import Any
 
+from .curve_config import LEGACY_CURVE_MAP, PRESET_CURVES, build_curve_library, legacy_response_curve_to_id
 from .patterns import _infer_target_type_from_legacy_classes, _truthy
+
+_PRESET_CURVES = PRESET_CURVES
+_LEGACY_CURVE_MAP = LEGACY_CURVE_MAP
+
+_LEGACY_RULE_KEYS = {
+    "RESPONSE_CURVE",
+    "CURVE_INTENSITY",
+    "CONSTANT_SPEED_PX",
+    "ACCEL_BOOST",
+    "ANTI_OVERSHOOT",
+    "SENS_COEFF",
+}
+
+
+def _to_scalar_aim_strength(value: float, legacy_percent: bool = True) -> float:
+    if legacy_percent and value > 1.0:
+        return value / 100.0
+    return value
+
+
+def _build_curve_library() -> dict[str, dict[str, Any]]:
+    return build_curve_library()
+
+
+def _migrate_rule(item: dict[str, Any], raw_item: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Normalize a single CV trigger rule to canonical format.
+    
+    Accepts legacy/transitional keys, outputs canonical shape with
+    scalar AIM_STRENGTH, AIM_CURVE_ID, MAX_AIM_SPEED_PX, etc.
+    Old runtime keys (RESPONSE_CURVE, CURVE_INTENSITY, CONSTANT_SPEED_PX,
+    ACCEL_BOOST, ANTI_OVERSHOOT) are consumed and removed.
+    """
+    item = dict(item)
+
+    src = raw_item or item
+    canonical_shape = "AIM_CURVE_ID" in item or "MAX_AIM_SPEED_PX" in item
+    legacy_percent = (not canonical_shape) or bool(_LEGACY_RULE_KEYS & set(item)) or bool(_LEGACY_RULE_KEYS & set(src))
+    old_sens = src.get("SENS_COEFF")
+    if old_sens is not None and "AIM_STRENGTH" not in item:
+        item["AIM_STRENGTH"] = min(float(old_sens) * 50.0, 100.0)
+        legacy_percent = True
+    item.pop("SENS_COEFF", None)
+
+    raw_str = item.pop("AIM_STRENGTH", None)
+    if raw_str is not None:
+        try:
+            item["AIM_STRENGTH"] = _to_scalar_aim_strength(float(raw_str), legacy_percent=legacy_percent)
+        except (ValueError, TypeError):
+            item["AIM_STRENGTH"] = 0.5
+    else:
+        item["AIM_STRENGTH"] = 0.5
+
+    legacy_curve = item.pop("RESPONSE_CURVE", None)
+    if legacy_curve is not None:
+        curve_id = legacy_response_curve_to_id(legacy_curve)
+    else:
+        curve_id = item.pop("AIM_CURVE_ID", "linear")
+    item.pop("CURVE_INTENSITY", None)
+    item["AIM_CURVE_ID"] = curve_id
+
+    old_speed = item.pop("CONSTANT_SPEED_PX", None)
+    if old_speed is not None:
+        item.setdefault("MAX_AIM_SPEED_PX", int(old_speed))
+    item.setdefault("MAX_AIM_SPEED_PX", 50)
+
+    item.pop("ACCEL_BOOST", None)
+    item.pop("ANTI_OVERSHOOT", None)
+
+    item.setdefault("SNAP_DISTANCE", 200)
+    item.setdefault("SMOOTHING_ALPHA", 0.0)
+    item.setdefault("NOISE_AMOUNT", 0.0)
+
+    return item
 
 
 def _migrate_legacy_config(config: dict[str, Any]) -> dict[str, Any]:
+    migrated = dict(config)
+    if "aim_curves" not in migrated:
+        migrated["aim_curves"] = _build_curve_library()
+
     if isinstance(config.get("configs"), dict):
-        migrated = dict(config)
         out_configs: dict[str, Any] = {}
         min_conf = None
         max_img = None
@@ -30,19 +107,7 @@ def _migrate_legacy_config(config: dict[str, Any]) -> dict[str, Any]:
             )
             item["target_type"] = str(item.get("target_type") or _infer_target_type_from_legacy_classes(legacy_classes)).strip().lower() or "both"
 
-            old_sens = raw_item.get("SENS_COEFF")
-            if old_sens is not None and "AIM_STRENGTH" not in item:
-                item["AIM_STRENGTH"] = min(float(old_sens) * 50.0, 100.0)
-            item.pop("SENS_COEFF", None)
-            item.setdefault("AIM_STRENGTH", 50.0)
-            item.setdefault("SNAP_DISTANCE", int(item.get("SNAP_DISTANCE", 200)))
-            item.setdefault("RESPONSE_CURVE", "proportional")
-            item.setdefault("CURVE_INTENSITY", 1.0)
-            item.setdefault("CONSTANT_SPEED_PX", 50)
-            item.setdefault("ACCEL_BOOST", 1.0)
-            item.setdefault("ANTI_OVERSHOOT", True)
-            item.setdefault("SMOOTHING_ALPHA", 0.0)
-            item.setdefault("NOISE_AMOUNT", 0.0)
+            item = _migrate_rule(item, raw_item)
 
             if "allowed_weapons" not in item and "only_when_weapon" in item:
                 item["allowed_weapons"] = item.get("only_when_weapon")
@@ -91,7 +156,7 @@ def _migrate_legacy_config(config: dict[str, Any]) -> dict[str, Any]:
             "CROSS_Y_THRESH_BOT": 32,
         }
 
-    # migrate SENS_COEFF → AIM_STRENGTH in legacy profile
+    # migrate SENS_COEFF -> AIM_STRENGTH in legacy profile
     if "SENS_COEFF" in legacy_profile and "AIM_STRENGTH" not in legacy_profile:
         legacy_profile["AIM_STRENGTH"] = min(float(legacy_profile["SENS_COEFF"]) * 50.0, 100.0)
     legacy_profile.pop("SENS_COEFF", None)
@@ -103,18 +168,12 @@ def _migrate_legacy_config(config: dict[str, Any]) -> dict[str, Any]:
     legacy_profile.setdefault("spray_target_offset_enabled", False)
     legacy_profile.setdefault("only_when_scoped_visual", False)
     legacy_profile.setdefault("target_type", _infer_target_type_from_legacy_classes(legacy_classes))
-    legacy_profile.setdefault("AIM_STRENGTH", 50.0)
-    legacy_profile.setdefault("RESPONSE_CURVE", "proportional")
-    legacy_profile.setdefault("CURVE_INTENSITY", 1.0)
-    legacy_profile.setdefault("CONSTANT_SPEED_PX", 50)
-    legacy_profile.setdefault("ACCEL_BOOST", 1.0)
-    legacy_profile.setdefault("ANTI_OVERSHOOT", True)
-    legacy_profile.setdefault("SMOOTHING_ALPHA", 0.0)
-    legacy_profile.setdefault("NOISE_AMOUNT", 0.0)
+
+    legacy_profile = _migrate_rule(legacy_profile)
+
     legacy_profile.pop("CONFIDENCE", None)
     legacy_profile.pop("IMG_SIZE", None)
 
-    migrated = dict(config)
     migrated["configs"] = {active_profile: legacy_profile}
     migrated.setdefault("inference_confidence", float(config.get("CONFIDENCE", 0.15) or 0.15))
     migrated.setdefault("inference_img_size", int(config.get("IMG_SIZE", 384) or 384))

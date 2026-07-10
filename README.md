@@ -172,7 +172,24 @@ Component settings live under `components` in each profile.
 - `counter_strafe`: Linux keyboard component with counter-strafe timing settings such as base, full-speed, min/max, shift/ctrl factors, curve, and manual brake windows.
 - `recoil`: Mouse recoil control using `resources/mouse_patterns.json`, GSI weapon state when available, sensitivity scaling, movement frequency, axis strength, optional noise, return-mouse behavior, and an optional bullet overlay.
 - `pixel_trigger`: Screen-pixel based trigger component using `mss`, a hold key, color-change threshold, click delay, cooldown, polling interval, monitor index, optional fixed coordinates, debug, and dry-run settings.
-- `cv_trigger`: Computer-vision trigger/aim component using `resources/best.pt`, monitor/game-resolution settings, target-side settings, inference thresholds, smoothing/prediction values, and per-rule activation/weapon/target/click settings.
+- `cv_trigger`: Computer-vision trigger/aim component using `resources/best.pt`, monitor/game-resolution settings, target-side settings, inference thresholds, smoothing/prediction values, a global aim curve library, and per-rule activation/weapon/target/click settings.
+
+#### CV Trigger Aim Assist Tuning
+
+CV Trigger aim movement is configured with a global `aim_curves` library plus per-rule scalar tuning. Each curve is a named list of normalized points where `x = 0.0` means the crosshair is on the target and `x = 1.0` means the target is at that rule's `SNAP_DISTANCE`. The curve `y` value is a normalized speed shape, then the runtime scales it by the rule's `MAX_AIM_SPEED_PX` and scalar `AIM_STRENGTH`.
+
+Each rule selects one global curve with `AIM_CURVE_ID` and keeps its own `SNAP_DISTANCE`, `MAX_AIM_SPEED_PX`, `AIM_STRENGTH`, and `NOISE_AMOUNT`. `AIM_STRENGTH` is a scalar: `0.0` disables aim movement, `0.5` is moderate, `1.0` is full baseline strength, and values above `1.0` are allowed for stronger movement. Noise is applied inside the no-overshoot motion engine so emitted movement cannot cross past the target.
+
+The built-in constant, linear, and exponential entries are editable curve templates in `aim_curves`; they are not separate runtime response modes. Current profiles should use `AIM_CURVE_ID` and `MAX_AIM_SPEED_PX` rather than legacy response-curve keys.
+
+Automated checks for this area can be run from the project root:
+
+```bash
+QT_QPA_PLATFORM=offscreen PYTHONPATH=. python tests/test_cv_rule_editor_config.py -v
+QT_QPA_PLATFORM=offscreen PYTHONPATH=. python tests/test_cv_trigger_editor_curves.py -v
+PYTHONPATH=. python tests/test_cv_trigger_config_migration.py -v
+PYTHONPATH=. python tests/test_cv_trigger_aim_motion.py -v
+```
 
 ## Architecture
 

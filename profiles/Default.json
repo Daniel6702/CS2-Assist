@@ -155,26 +155,33 @@
             "y": null
         },
         "cv_trigger": {
+            "enabled": true,
+            "model_path": "/home/Daniel6702/Applications/cs2/CS2-Assist/CS2-Assist/resources/best.pt",
+            "monitor": {
+                "top": 0,
+                "left": 0,
+                "width": 2560,
+                "height": 1440
+            },
+            "game_resolution": {
+                "width": 1600,
+                "height": 1200
+            },
+            "use_gsi_opponent_side": false,
+            "manual_target_side": "both",
+            "inference_confidence": 0.15,
+            "inference_img_size": 512,
+            "jitter_deadzone_px": 2.0,
+            "near_smoothing_alpha": 0.35,
+            "near_smoothing_radius_px": 32.0,
+            "x_prediction_enabled": true,
+            "x_prediction_lead_ms": 120.0,
+            "x_prediction_history_ms": 120.0,
+            "x_prediction_damping": 0.7,
+            "x_prediction_max_delta_px": 200.0,
             "configs": {
                 "rifle_always": {
-                    "ACCEL_BOOST": 1.0,
-                    "AIM_MODE": "head",
-                    "AIM_STRENGTH": 100.0,
-                    "ANTI_OVERSHOOT": true,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "CLICK_HOLD_MS": 20,
-                    "CONSTANT_SPEED_PX": 50,
-                    "COOLDOWN_MS": 350,
-                    "CROSS_X_THRESH": 30,
-                    "CROSS_Y_THRESH_BOT": 35,
-                    "CROSS_Y_THRESH_TOP": 20,
-                    "CURVE_INTENSITY": 1.0,
-                    "HEAD_OFFSET": 0.14,
-                    "NOISE_AMOUNT": 0.0,
-                    "RESPONSE_CURVE": "accelerating",
-                    "SETTLE_FRAMES": 2,
-                    "SMOOTHING_ALPHA": 0.5,
-                    "SNAP_DISTANCE": 120,
+                    "enabled": true,
                     "activation": {
                         "mode": "always"
                     },
@@ -187,35 +194,32 @@
                         "weapon_aug",
                         "weapon_sg556"
                     ],
-                    "auto_shoot": false,
-                    "auto_shoot_aim_cooldown_ms": 0,
-                    "enabled": true,
+                    "target_type": "both",
                     "only_when_scoped_visual": false,
+                    "auto_shoot": false,
                     "spray_target_offset_enabled": true,
-                    "target_type": "both"
+                    "AIM_MODE": "head",
+                    "HEAD_OFFSET": 0.14,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "SNAP_DISTANCE": 150,
+                    "SETTLE_FRAMES": 2,
+                    "CLICK_HOLD_MS": 20,
+                    "COOLDOWN_MS": 350,
+                    "auto_shoot_aim_cooldown_ms": 0,
+                    "AIM_STRENGTH": 1.0,
+                    "AIM_CURVE_ID": "test",
+                    "MAX_AIM_SPEED_PX": 50,
+                    "SMOOTHING_ALPHA": 0.5,
+                    "NOISE_AMOUNT": 0.0,
+                    "CROSS_X_THRESH": 30,
+                    "CROSS_Y_THRESH_TOP": 20,
+                    "CROSS_Y_THRESH_BOT": 35
                 },
                 "rifle_shoot": {
-                    "ACCEL_BOOST": 1.0,
-                    "AIM_MODE": "head",
-                    "AIM_STRENGTH": 90.0,
-                    "ANTI_OVERSHOOT": true,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "CLICK_HOLD_MS": 15,
-                    "CONSTANT_SPEED_PX": 60,
-                    "COOLDOWN_MS": 250,
-                    "CROSS_X_THRESH": 14,
-                    "CROSS_Y_THRESH_BOT": 32,
-                    "CROSS_Y_THRESH_TOP": 18,
-                    "CURVE_INTENSITY": 0.8,
-                    "HEAD_OFFSET": 0.18,
-                    "NOISE_AMOUNT": 0.0,
-                    "RESPONSE_CURVE": "proportional",
-                    "SETTLE_FRAMES": 2,
-                    "SMOOTHING_ALPHA": 0.0,
-                    "SNAP_DISTANCE": 60,
+                    "enabled": false,
                     "activation": {
-                        "button": "left",
-                        "device": "mouse"
+                        "device": "mouse",
+                        "button": "left"
                     },
                     "allowed_weapons": [
                         "weapon_ak47",
@@ -226,132 +230,179 @@
                         "weapon_aug",
                         "weapon_sg556"
                     ],
-                    "auto_shoot": false,
-                    "auto_shoot_aim_cooldown_ms": 0,
-                    "enabled": false,
+                    "target_type": "both",
                     "only_when_scoped_visual": false,
+                    "auto_shoot": false,
                     "spray_target_offset_enabled": true,
-                    "target_type": "both"
+                    "AIM_MODE": "head",
+                    "HEAD_OFFSET": 0.18,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "SNAP_DISTANCE": 60,
+                    "SETTLE_FRAMES": 2,
+                    "CLICK_HOLD_MS": 15,
+                    "COOLDOWN_MS": 250,
+                    "auto_shoot_aim_cooldown_ms": 0,
+                    "AIM_STRENGTH": 0.9,
+                    "AIM_CURVE_ID": "linear",
+                    "MAX_AIM_SPEED_PX": 60,
+                    "SMOOTHING_ALPHA": 0.0,
+                    "NOISE_AMOUNT": 0.0,
+                    "CROSS_X_THRESH": 14,
+                    "CROSS_Y_THRESH_TOP": 18,
+                    "CROSS_Y_THRESH_BOT": 32
                 },
                 "trigger": {
-                    "ACCEL_BOOST": 1.0,
-                    "AIM_MODE": "head",
-                    "AIM_STRENGTH": 0.0,
-                    "ANTI_OVERSHOOT": true,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "CLICK_HOLD_MS": 1,
-                    "CONSTANT_SPEED_PX": 50,
-                    "COOLDOWN_MS": 300,
-                    "CROSS_X_THRESH": 25,
-                    "CROSS_Y_THRESH_BOT": 40,
-                    "CROSS_Y_THRESH_TOP": 40,
-                    "CURVE_INTENSITY": 1.0,
-                    "HEAD_OFFSET": 0.12,
-                    "NOISE_AMOUNT": 0.0,
-                    "RESPONSE_CURVE": "proportional",
-                    "SETTLE_FRAMES": 0,
-                    "SMOOTHING_ALPHA": 0.0,
-                    "SNAP_DISTANCE": 18,
+                    "enabled": false,
                     "activation": {
                         "device": "keyboard",
                         "key": "alt"
                     },
-                    "auto_shoot": true,
-                    "auto_shoot_aim_cooldown_ms": 0,
-                    "enabled": false,
+                    "target_type": "both",
                     "only_when_scoped_visual": false,
+                    "auto_shoot": true,
                     "spray_target_offset_enabled": false,
-                    "target_type": "both"
+                    "AIM_MODE": "head",
+                    "HEAD_OFFSET": 0.12,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "SNAP_DISTANCE": 18,
+                    "SETTLE_FRAMES": 0,
+                    "CLICK_HOLD_MS": 1,
+                    "COOLDOWN_MS": 300,
+                    "auto_shoot_aim_cooldown_ms": 0,
+                    "AIM_STRENGTH": 0.0,
+                    "AIM_CURVE_ID": "linear",
+                    "MAX_AIM_SPEED_PX": 50,
+                    "SMOOTHING_ALPHA": 0.0,
+                    "NOISE_AMOUNT": 0.0,
+                    "CROSS_X_THRESH": 25,
+                    "CROSS_Y_THRESH_TOP": 40,
+                    "CROSS_Y_THRESH_BOT": 40
                 },
                 "usp1": {
-                    "ACCEL_BOOST": 1.0,
-                    "AIM_MODE": "head",
-                    "AIM_STRENGTH": 60.0,
-                    "ANTI_OVERSHOOT": true,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "CLICK_HOLD_MS": 15,
-                    "CONSTANT_SPEED_PX": 50,
-                    "COOLDOWN_MS": 350,
-                    "CROSS_X_THRESH": 12,
-                    "CROSS_Y_THRESH_BOT": 32,
-                    "CROSS_Y_THRESH_TOP": 18,
-                    "CURVE_INTENSITY": 1.0,
-                    "HEAD_OFFSET": 0.1,
-                    "NOISE_AMOUNT": 0.0,
-                    "RESPONSE_CURVE": "proportional",
-                    "SETTLE_FRAMES": 1,
-                    "SMOOTHING_ALPHA": 0.0,
-                    "SNAP_DISTANCE": 50,
+                    "enabled": false,
                     "activation": {
                         "mode": "always"
                     },
                     "allowed_weapons": [
                         "weapon_usp_silencer"
                     ],
-                    "auto_shoot": false,
-                    "auto_shoot_aim_cooldown_ms": 0,
-                    "enabled": false,
+                    "target_type": "both",
                     "only_when_scoped_visual": false,
+                    "auto_shoot": false,
                     "spray_target_offset_enabled": false,
-                    "target_type": "both"
+                    "AIM_MODE": "head",
+                    "HEAD_OFFSET": 0.1,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "SNAP_DISTANCE": 50,
+                    "SETTLE_FRAMES": 1,
+                    "CLICK_HOLD_MS": 15,
+                    "COOLDOWN_MS": 350,
+                    "auto_shoot_aim_cooldown_ms": 0,
+                    "AIM_STRENGTH": 0.6,
+                    "AIM_CURVE_ID": "linear",
+                    "MAX_AIM_SPEED_PX": 50,
+                    "SMOOTHING_ALPHA": 0.0,
+                    "NOISE_AMOUNT": 0.0,
+                    "CROSS_X_THRESH": 12,
+                    "CROSS_Y_THRESH_TOP": 18,
+                    "CROSS_Y_THRESH_BOT": 32
                 },
                 "usp2": {
-                    "ACCEL_BOOST": 1.0,
-                    "AIM_MODE": "head",
-                    "AIM_STRENGTH": 40.0,
-                    "ANTI_OVERSHOOT": true,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "CLICK_HOLD_MS": 15,
-                    "CONSTANT_SPEED_PX": 40,
-                    "COOLDOWN_MS": 350,
-                    "CROSS_X_THRESH": 4,
-                    "CROSS_Y_THRESH_BOT": 32,
-                    "CROSS_Y_THRESH_TOP": 18,
-                    "CURVE_INTENSITY": 1.2,
-                    "HEAD_OFFSET": 0.1,
-                    "NOISE_AMOUNT": 0.0,
-                    "RESPONSE_CURVE": "proportional",
-                    "SETTLE_FRAMES": 2,
-                    "SMOOTHING_ALPHA": 0.0,
-                    "SNAP_DISTANCE": 40,
+                    "enabled": false,
                     "activation": {
                         "mode": "always"
                     },
                     "allowed_weapons": [
                         "weapon_usp_silencer"
                     ],
-                    "auto_shoot": false,
-                    "auto_shoot_aim_cooldown_ms": 0,
-                    "enabled": false,
+                    "target_type": "both",
                     "only_when_scoped_visual": false,
+                    "auto_shoot": false,
                     "spray_target_offset_enabled": false,
-                    "target_type": "both"
+                    "AIM_MODE": "head",
+                    "HEAD_OFFSET": 0.1,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "SNAP_DISTANCE": 40,
+                    "SETTLE_FRAMES": 2,
+                    "CLICK_HOLD_MS": 15,
+                    "COOLDOWN_MS": 350,
+                    "auto_shoot_aim_cooldown_ms": 0,
+                    "AIM_STRENGTH": 0.4,
+                    "AIM_CURVE_ID": "linear",
+                    "MAX_AIM_SPEED_PX": 40,
+                    "SMOOTHING_ALPHA": 0.0,
+                    "NOISE_AMOUNT": 0.0,
+                    "CROSS_X_THRESH": 4,
+                    "CROSS_Y_THRESH_TOP": 18,
+                    "CROSS_Y_THRESH_BOT": 32
                 }
             },
-            "enabled": true,
-            "game_resolution": {
-                "height": 1200,
-                "width": 1600
-            },
-            "inference_confidence": 0.15,
-            "inference_img_size": 512,
-            "jitter_deadzone_px": 2.0,
-            "manual_target_side": "both",
-            "model_path": "/home/Daniel6702/Applications/cs2/CS2-Assist/CS2-Assist/resources/best.pt",
-            "monitor": {
-                "height": 1440,
-                "left": 0,
-                "top": 0,
-                "width": 2560
-            },
-            "near_smoothing_alpha": 0.35,
-            "near_smoothing_radius_px": 32.0,
-            "use_gsi_opponent_side": false,
-            "x_prediction_damping": 0.7,
-            "x_prediction_enabled": true,
-            "x_prediction_history_ms": 120.0,
-            "x_prediction_lead_ms": 120.0,
-            "x_prediction_max_delta_px": 200.0
+            "aim_curves": {
+                "constant_50": {
+                    "label": "Constant 50%",
+                    "points": [
+                        [
+                            0.0,
+                            0.5
+                        ],
+                        [
+                            1.0,
+                            0.5
+                        ]
+                    ]
+                },
+                "exponential": {
+                    "label": "Exponential",
+                    "points": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            0.25,
+                            0.06
+                        ],
+                        [
+                            0.5,
+                            0.25
+                        ],
+                        [
+                            0.75,
+                            0.56
+                        ],
+                        [
+                            1.0,
+                            1.0
+                        ]
+                    ]
+                },
+                "linear": {
+                    "label": "Linear",
+                    "points": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            1.0,
+                            1.0
+                        ]
+                    ]
+                },
+                "test": {
+                    "label": "Test",
+                    "points": [
+                        [
+                            0.0,
+                            1.0
+                        ],
+                        [
+                            1.0,
+                            0.0
+                        ]
+                    ]
+                }
+            }
         }
     }
 }
