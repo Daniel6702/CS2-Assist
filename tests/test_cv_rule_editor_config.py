@@ -11,6 +11,7 @@ from PySide6 import QtWidgets  # noqa: E402
 
 app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
 
+from app.device_service import DeviceService  # noqa: E402
 from app.ui.widgets.cv_rule_editor import CVRuleEditor  # noqa: E402
 from app.ui.widgets.cv_trigger_editor import CVTriggerEditor  # noqa: E402
 
@@ -36,6 +37,7 @@ def _rule_editor() -> CVRuleEditor:
 def _canonical_rule() -> dict[str, Any]:
     return {
         "enabled": True,
+        "priority": 3,
         "activation": {"mode": "always"},
         "auto_shoot": True,
         "target_type": "both",
@@ -67,6 +69,7 @@ class CVRuleEditorCanonicalTests(unittest.TestCase):
         self.assertEqual(rule["MAX_AIM_SPEED_PX"], 70)
         self.assertEqual(rule["SNAP_DISTANCE"], 250)
         self.assertEqual(rule["NOISE_AMOUNT"], 2.5)
+        self.assertEqual(rule["priority"], 3)
         self.assertTrue(LEGACY_KEYS.isdisjoint(rule))
 
     def test_aim_strength_is_scalar_without_percent_suffix(self) -> None:
@@ -104,10 +107,18 @@ class CVRuleEditorCanonicalTests(unittest.TestCase):
 
         self.assertEqual(editor.extract_rule()[1]["AIM_CURVE_ID"], "linear")
 
+    def test_missing_priority_defaults_to_zero(self) -> None:
+        editor = _rule_editor()
+        rule = _canonical_rule()
+        rule.pop("priority")
+        editor.load_rule("rifle", rule)
+
+        self.assertEqual(editor.extract_rule()[1]["priority"], 0)
+
 
 class CVTriggerEditorCurveIntegrationTests(unittest.TestCase):
     def test_rule_editors_receive_global_curve_library(self) -> None:
-        editor = CVTriggerEditor("cv_trigger", "CV Trigger", device_service=None)
+        editor = CVTriggerEditor("cv_trigger", "CV Trigger", device_service=DeviceService())
         editor.load_config({
             "enabled": True,
             "aim_curves": {

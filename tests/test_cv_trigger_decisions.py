@@ -6,12 +6,16 @@ from app.components.cv_trigger.core import (
     _anti_oscillation_reversal_lock_frames,
     _auto_shoot_zone_contains_crosshair,
     _curve_points_for_rule,
+    _highest_priority_rule_names,
     _lock_body_y_axis,
     _raw_aim_error,
     _raw_error_sign,
+    _rule_priority,
     _shot_cooldown_active,
     _smoothed_error_for_rule,
+    _sum_motion_counts,
 )
+from app.components.cv_trigger.aim_motion import AimMotionResult
 from app.components.cv_trigger.curve_config import build_curve_library
 
 
@@ -121,6 +125,29 @@ class CVTriggerDecisionTests(unittest.TestCase):
     def test_body_mode_line_target_removes_carried_y_smoothing(self) -> None:
         self.assertEqual(_lock_body_y_axis((5.0, -12.0), body_y_axis_loose=True), (5.0, 0.0))
         self.assertEqual(_lock_body_y_axis((5.0, -12.0), body_y_axis_loose=False), (5.0, -12.0))
+
+    def test_rule_priority_defaults_invalid_values_to_zero(self) -> None:
+        self.assertEqual(_rule_priority({}), 0)
+        self.assertEqual(_rule_priority({"priority": "bad"}), 0)
+        self.assertEqual(_rule_priority({"priority": "2"}), 2)
+
+    def test_highest_priority_rule_names_suppresses_lower_tiers(self) -> None:
+        configs = {
+            "body": {"priority": 0},
+            "head": {"priority": 1},
+            "head_support": {"priority": 1},
+        }
+
+        self.assertEqual(_highest_priority_rule_names(configs, ["body", "head", "head_support"]), ["head", "head_support"])
+        self.assertEqual(_highest_priority_rule_names(configs, ["body"]), ["body"])
+
+    def test_same_priority_motion_counts_combine(self) -> None:
+        combined = _sum_motion_counts([
+            AimMotionResult(dx=3, dy=0, arrived=False),
+            AimMotionResult(dx=-1, dy=4, arrived=False),
+        ])
+
+        self.assertEqual(combined, (2, 4))
 
 
 if __name__ == "__main__":

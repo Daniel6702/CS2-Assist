@@ -125,6 +125,7 @@ def default_profile() -> dict[str, Any]:
                 "configs": {
                     "rifle_alt_aim_only": {
                         "enabled": True,
+                        "priority": 0,
                         "activation": {"device": "keyboard", "key": "alt"},
                         "allowed_weapons": [
                             "weapon_ak47",
@@ -155,6 +156,7 @@ def default_profile() -> dict[str, Any]:
                     },
                     "sniper_always_autoshoot": {
                         "enabled": True,
+                        "priority": 0,
                         "activation": {"mode": "always"},
                         "allowed_weapons": ["weapon_awp", "weapon_ssg08", "weapon_scar20", "weapon_g3sg1"],
                         "auto_shoot": True,

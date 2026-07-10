@@ -75,6 +75,10 @@ def _migrate_rule(item: dict[str, Any], raw_item: dict[str, Any] | None = None) 
     item.setdefault("SNAP_DISTANCE", 200)
     item.setdefault("SMOOTHING_ALPHA", 0.0)
     item.setdefault("NOISE_AMOUNT", 0.0)
+    try:
+        item["priority"] = int(item.get("priority", 0))
+    except (TypeError, ValueError):
+        item["priority"] = 0
 
     return item
 

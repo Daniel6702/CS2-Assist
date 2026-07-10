@@ -91,6 +91,24 @@ def _lock_body_y_axis(error_px: tuple[float, float], *, body_y_axis_loose: bool)
     return error_px
 
 
+def _rule_priority(rule: dict[str, Any]) -> int:
+    try:
+        return int(rule.get("priority", 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _highest_priority_rule_names(configs: dict[str, dict[str, Any]], active_names: list[str]) -> list[str]:
+    if not active_names:
+        return []
+    highest = max(_rule_priority(configs[name]) for name in active_names)
+    return [name for name in active_names if _rule_priority(configs[name]) == highest]
+
+
+def _sum_motion_counts(motions: list[aim_motion.AimMotionResult]) -> tuple[int, int]:
+    return sum(motion.dx for motion in motions), sum(motion.dy for motion in motions)
+
+
 def _auto_shoot_zone_contains_crosshair(
     *,
     box: tuple[int, int, int, int],
@@ -575,6 +593,7 @@ class CVTriggerComponent(BaseComponent):
                     and self._weapon_allowed(item)
                     and self._scope_allowed(item, scoped_visual)
                 ]
+                active_names = _highest_priority_rule_names(enabled_configs, active_names)
                 active_name_set = set(active_names)
                 for name in enabled_configs:
                     if name not in active_name_set:
@@ -899,39 +918,40 @@ class CVTriggerComponent(BaseComponent):
                     continue
 
                 if movement_candidates:
-                    m = min(movement_candidates, key=lambda item: item["d2"])
-                    error_px = _smoothed_error_for_rule(
-                        rule_name=m["name"],
-                        error_px=(m["dx"], m["dy"]),
-                        smoothing_alpha=m["aim_smoothing_alpha"],
-                        per_rule_smooth=per_rule_smooth,
-                    )
-                    error_px = _lock_body_y_axis(error_px, body_y_axis_loose=bool(m["body_y_axis_loose"]))
-                    if m["body_y_axis_loose"]:
-                        per_rule_smooth[m["name"]] = error_px
-                    motion = aim_motion.compute_aim_motion(
-                        error_px,
-                        aim_motion.AimMotionConfig(
-                            aim_strength=m["aim_strength"],
-                            snap_distance=m["snap_distance"],
-                            max_aim_speed_px=m["max_aim_speed_px"],
-                            sens_mult_x=m["sens_mult_x"],
-                            sens_mult_y=m["sens_mult_y"],
-                            noise_px=m["noise_amount"],
-                            curve_points=m["curve_points"],
-                            anti_oscillation_radius_px=m["anti_oscillation_radius_px"],
-                            anti_oscillation_reserve_counts=m["anti_oscillation_reserve_counts"],
-                        ),
-                        limit_error_px=(m["limit_dx"], m["limit_dy"]),
-                    )
-                    if motion.arrived:
-                        per_rule_smooth.pop(m["name"], None)
-                        filtered_error[m["name"]] = None
-                        raw_error_signs[m["name"]] = None
-                        reversal_locks[m["name"]] = 0
-                        x_predictor.reset(m["name"])
-                    mdx = motion.dx
-                    mdy = motion.dy
+                    motions: list[aim_motion.AimMotionResult] = []
+                    for m in movement_candidates:
+                        error_px = _smoothed_error_for_rule(
+                            rule_name=m["name"],
+                            error_px=(m["dx"], m["dy"]),
+                            smoothing_alpha=m["aim_smoothing_alpha"],
+                            per_rule_smooth=per_rule_smooth,
+                        )
+                        error_px = _lock_body_y_axis(error_px, body_y_axis_loose=bool(m["body_y_axis_loose"]))
+                        if m["body_y_axis_loose"]:
+                            per_rule_smooth[m["name"]] = error_px
+                        motion = aim_motion.compute_aim_motion(
+                            error_px,
+                            aim_motion.AimMotionConfig(
+                                aim_strength=m["aim_strength"],
+                                snap_distance=m["snap_distance"],
+                                max_aim_speed_px=m["max_aim_speed_px"],
+                                sens_mult_x=m["sens_mult_x"],
+                                sens_mult_y=m["sens_mult_y"],
+                                noise_px=m["noise_amount"],
+                                curve_points=m["curve_points"],
+                                anti_oscillation_radius_px=m["anti_oscillation_radius_px"],
+                                anti_oscillation_reserve_counts=m["anti_oscillation_reserve_counts"],
+                            ),
+                            limit_error_px=(m["limit_dx"], m["limit_dy"]),
+                        )
+                        motions.append(motion)
+                        if motion.arrived:
+                            per_rule_smooth.pop(m["name"], None)
+                            filtered_error[m["name"]] = None
+                            raw_error_signs[m["name"]] = None
+                            reversal_locks[m["name"]] = 0
+                            x_predictor.reset(m["name"])
+                    mdx, mdy = _sum_motion_counts(motions)
                     if mdx or mdy:
                         if _eased and (abs(mdx) > 15 or abs(mdy) > 15):
                             vmouse.eased_emit_rel(mdx, mdy)

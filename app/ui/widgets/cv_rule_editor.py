@@ -51,6 +51,7 @@ class CVRuleEditor(QtWidgets.QFrame):
 
     _KNOWN_KEYS = {
         "enabled",
+        "priority",
         "activation",
         "allowed_weapons",
         "only_when_weapon",
@@ -78,7 +79,7 @@ class CVRuleEditor(QtWidgets.QFrame):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setFrameShape(QtWidgets.QFrame.StyledPanel)
+        self.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.setObjectName("cvRuleEditor")
         self.setStyleSheet("QFrame#cvRuleEditor { border: 1px solid #bbb; border-radius: 6px; }")
         self._suspend = False
@@ -99,9 +100,12 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.name_edit.editingFinished.connect(self._emit_change)
         header.addWidget(self.name_edit, 1)
 
-        self.expand = QtWidgets.QToolButton(text="Details", checkable=True, checked=False)
-        self.expand.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
-        self.expand.setArrowType(QtCore.Qt.RightArrow)
+        self.expand = QtWidgets.QToolButton()
+        self.expand.setText("Details")
+        self.expand.setCheckable(True)
+        self.expand.setChecked(False)
+        self.expand.setToolButtonStyle(QtCore.Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.expand.setArrowType(QtCore.Qt.ArrowType.RightArrow)
         self.expand.clicked.connect(self._toggle_expanded)
         header.addWidget(self.expand)
 
@@ -129,7 +133,7 @@ class CVRuleEditor(QtWidgets.QFrame):
 
         activation_group = QtWidgets.QGroupBox("Activation")
         activation_form = QtWidgets.QFormLayout(activation_group)
-        activation_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        activation_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         activation_form.setHorizontalSpacing(12)
         activation_form.setVerticalSpacing(6)
         top_row.addWidget(activation_group, 1)
@@ -152,9 +156,15 @@ class CVRuleEditor(QtWidgets.QFrame):
         activation_form.addRow("Mouse button", self.activation_button)
         self.activation_button_label = activation_form.labelForField(self.activation_button)
 
+        self.priority = QtWidgets.QSpinBox()
+        self.priority.setRange(-2_147_483_648, 2_147_483_647)
+        self.priority.setToolTip("Higher active priority suppresses lower-priority rules. Same priority rules combine.")
+        self.priority.valueChanged.connect(self._emit_change)
+        activation_form.addRow("Priority", self.priority)
+
         filter_group = QtWidgets.QGroupBox("Target & Weapon Filters")
         filter_form = QtWidgets.QFormLayout(filter_group)
-        filter_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        filter_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         filter_form.setHorizontalSpacing(12)
         filter_form.setVerticalSpacing(6)
         top_row.addWidget(filter_group, 2)
@@ -181,7 +191,7 @@ class CVRuleEditor(QtWidgets.QFrame):
 
         targeting_group = QtWidgets.QGroupBox("Targeting")
         targeting_form = QtWidgets.QFormLayout(targeting_group)
-        targeting_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        targeting_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         targeting_form.setHorizontalSpacing(12)
         targeting_form.setVerticalSpacing(6)
         tuning_row1.addWidget(targeting_group, 1)
@@ -218,11 +228,11 @@ class CVRuleEditor(QtWidgets.QFrame):
         timing_layout.setContentsMargins(8, 8, 8, 8)
         timing_layout.setSpacing(12)
         timing_form = QtWidgets.QFormLayout()
-        timing_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        timing_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         timing_form.setHorizontalSpacing(12)
         timing_form.setVerticalSpacing(6)
         threshold_form = QtWidgets.QFormLayout()
-        threshold_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        threshold_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         threshold_form.setHorizontalSpacing(12)
         threshold_form.setVerticalSpacing(6)
         timing_layout.addLayout(timing_form, 1)
@@ -232,7 +242,7 @@ class CVRuleEditor(QtWidgets.QFrame):
         # ── Aim Tuning (new configurable box) ────────────────────────────
         aim_tuning_group = QtWidgets.QGroupBox("Aim Tuning")
         aim_tuning_form = QtWidgets.QFormLayout(aim_tuning_group)
-        aim_tuning_form.setLabelAlignment(QtCore.Qt.AlignTop)
+        aim_tuning_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         aim_tuning_form.setHorizontalSpacing(12)
         aim_tuning_form.setVerticalSpacing(6)
         content_layout.addWidget(aim_tuning_group)
@@ -345,7 +355,7 @@ class CVRuleEditor(QtWidgets.QFrame):
         self._update_summary()
 
     def _toggle_expanded(self, checked: bool) -> None:
-        self.expand.setArrowType(QtCore.Qt.DownArrow if checked else QtCore.Qt.RightArrow)
+        self.expand.setArrowType(QtCore.Qt.ArrowType.DownArrow if checked else QtCore.Qt.ArrowType.RightArrow)
         self.content.setVisible(checked)
 
     def _sync_header_title(self) -> None:
@@ -412,12 +422,13 @@ class CVRuleEditor(QtWidgets.QFrame):
         weapons = self.allowed_weapons.text().strip()
         weapon_text = f" | weapons: {weapons}" if weapons else " | any weapon"
         shoot_text = " | auto shoot" if self.auto_shoot.isChecked() else " | aim only"
+        priority_text = f" | priority {self.priority.value()}"
         aim_cd = self.auto_shoot_aim_cooldown_ms.value()
         aim_cd_text = f" | aim cd {aim_cd}ms" if aim_cd > 0 else ""
         type_text = f" | {self._target_type_value()}"
         scope_text = " | scoped only" if self.only_when_scoped_visual.isChecked() else ""
         spray_text = " | spray-align" if self.spray_target_offset_enabled.isChecked() else ""
-        self.summary.setText(f"{name} — {activation}{weapon_text}{type_text}{scope_text}{shoot_text}{spray_text}{aim_cd_text}")
+        self.summary.setText(f"{name} — {activation}{priority_text}{weapon_text}{type_text}{scope_text}{shoot_text}{spray_text}{aim_cd_text}")
 
     def rule_name(self) -> str:
         return self.name_edit.text().strip()
@@ -428,6 +439,11 @@ class CVRuleEditor(QtWidgets.QFrame):
             data = dict(rule or {})
             self.name_edit.setText(name)
             self.enabled.setChecked(bool(data.get("enabled", True)))
+            try:
+                priority = int(data.get("priority", 0) or 0)
+            except (TypeError, ValueError):
+                priority = 0
+            self.priority.setValue(priority)
 
             activation = dict(data.get("activation", {}))
             if str(activation.get("mode", "")).strip().lower() == "always":
@@ -481,6 +497,7 @@ class CVRuleEditor(QtWidgets.QFrame):
         data: dict[str, Any] = {}
 
         data["enabled"] = self.enabled.isChecked()
+        data["priority"] = self.priority.value()
         mode = self.activation_mode.currentText().strip().lower()
         if mode == "always":
             data["activation"] = {"mode": "always"}

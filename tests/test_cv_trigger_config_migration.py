@@ -113,6 +113,13 @@ class MigrateRuleTests(unittest.TestCase):
         result = _migrate_rule({})
         self.assertEqual(result["AIM_STRENGTH"], 0.5)
 
+    def test_priority_defaults_to_zero_when_missing_or_invalid(self) -> None:
+        self.assertEqual(_migrate_rule({})["priority"], 0)
+        self.assertEqual(_migrate_rule({"priority": "bad"})["priority"], 0)
+
+    def test_priority_is_preserved_as_integer(self) -> None:
+        self.assertEqual(_migrate_rule({"priority": "2"})["priority"], 2)
+
     def test_maps_legacy_response_curve_to_aim_curve_id(self) -> None:
         result = _migrate_rule({"RESPONSE_CURVE": "proportional"})
         self.assertEqual(result["AIM_CURVE_ID"], "linear")
@@ -450,6 +457,12 @@ class DefaultProfileCanonicalTests(unittest.TestCase):
             self.assertIn("SNAP_DISTANCE", rule, f"{name} missing SNAP_DISTANCE")
             self.assertIn("SMOOTHING_ALPHA", rule, f"{name} missing SMOOTHING_ALPHA")
 
+    def test_default_rules_have_priority(self) -> None:
+        cv = default_profile()["components"]["cv_trigger"]
+        for name, rule in cv["configs"].items():
+            with self.subTest(rule=name):
+                self.assertEqual(rule["priority"], 0)
+
 
 class CheckedInProfileCanonicalTests(unittest.TestCase):
     """Validate profiles/Default.json against canonical format."""
@@ -514,6 +527,11 @@ class CheckedInProfileCanonicalTests(unittest.TestCase):
         for name, rule in self.configs.items():
             with self.subTest(rule=name):
                 self.assertIn("SNAP_DISTANCE", rule, f"{name} missing SNAP_DISTANCE")
+
+    def test_rules_have_priority(self) -> None:
+        for name, rule in self.configs.items():
+            with self.subTest(rule=name):
+                self.assertIsInstance(rule.get("priority"), int, f"{name} missing integer priority")
 
 
 if __name__ == "__main__":

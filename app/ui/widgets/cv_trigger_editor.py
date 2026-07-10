@@ -35,6 +35,10 @@ def _normalize_cv_trigger_config_for_ui(config: dict[str, Any]) -> dict[str, Any
     for raw_name, raw_item in dict(cfg.get("configs", {})).items():
         item = dict(raw_item or {})
         item["enabled"] = bool(item.get("enabled", True))
+        try:
+            item["priority"] = int(item.get("priority", 0))
+        except (TypeError, ValueError):
+            item["priority"] = 0
         activation = item.get("activation")
         if not isinstance(activation, dict):
             activation = {"device": "keyboard", "key": "alt"}
@@ -307,6 +311,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
                     "pistol_alt",
                     {
                         "enabled": True,
+                        "priority": 0,
                         "activation": {"device": "keyboard", "key": "alt"},
                         "auto_shoot": True,
                         "target_type": "both",
@@ -379,6 +384,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
             f"rule_{index}",
             {
                 "enabled": True,
+                "priority": 0,
                 "activation": {"mode": "always"},
                 "auto_shoot": True,
                 "target_type": "both",
