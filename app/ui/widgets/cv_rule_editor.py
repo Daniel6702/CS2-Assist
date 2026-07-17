@@ -72,9 +72,9 @@ class CVRuleEditor(QtWidgets.QFrame):
         "MAX_AIM_SPEED_PX",
         "SMOOTHING_ALPHA",
         "NOISE_AMOUNT",
-        "CROSS_X_THRESH",
-        "CROSS_Y_THRESH_TOP",
-        "CROSS_Y_THRESH_BOT",
+        "AUTO_SHOOT_ZONE_WIDTH",
+        "AUTO_SHOOT_ZONE_HEIGHT",
+        "AUTO_SHOOT_ZONE_Y_POS",
     }
 
     def __init__(self, parent=None) -> None:
@@ -328,20 +328,37 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.cooldown_ms.valueChanged.connect(self._emit_change)
         timing_form.addRow("Cooldown ms", self.cooldown_ms)
 
-        self.cross_x_thresh = QtWidgets.QSpinBox()
-        self.cross_x_thresh.setRange(0, 2000)
-        self.cross_x_thresh.valueChanged.connect(self._emit_change)
-        threshold_form.addRow("Cross X threshold", self.cross_x_thresh)
+        self.auto_shoot_zone_width = QtWidgets.QSpinBox()
+        self.auto_shoot_zone_width.setRange(0, 500)
+        self.auto_shoot_zone_width.setSuffix(" px")
+        self.auto_shoot_zone_width.setToolTip(
+            "Total width of the auto-shoot trigger zone.\n"
+            "The zone is centred horizontally on the target detection box."
+        )
+        self.auto_shoot_zone_width.valueChanged.connect(self._emit_change)
+        threshold_form.addRow("Zone width", self.auto_shoot_zone_width)
 
-        self.cross_y_top = QtWidgets.QSpinBox()
-        self.cross_y_top.setRange(-2000, 2000)
-        self.cross_y_top.valueChanged.connect(self._emit_change)
-        threshold_form.addRow("Cross Y top", self.cross_y_top)
+        self.auto_shoot_zone_height = QtWidgets.QSpinBox()
+        self.auto_shoot_zone_height.setRange(0, 500)
+        self.auto_shoot_zone_height.setSuffix(" px")
+        self.auto_shoot_zone_height.setToolTip(
+            "Total height of the auto-shoot trigger zone.\n"
+            "The zone is centred vertically at the Y position below."
+        )
+        self.auto_shoot_zone_height.valueChanged.connect(self._emit_change)
+        threshold_form.addRow("Zone height", self.auto_shoot_zone_height)
 
-        self.cross_y_bot = QtWidgets.QSpinBox()
-        self.cross_y_bot.setRange(-2000, 2000)
-        self.cross_y_bot.valueChanged.connect(self._emit_change)
-        threshold_form.addRow("Cross Y bottom", self.cross_y_bot)
+        self.auto_shoot_zone_y_pos = QtWidgets.QDoubleSpinBox()
+        self.auto_shoot_zone_y_pos.setRange(0.0, 1.0)
+        self.auto_shoot_zone_y_pos.setDecimals(3)
+        self.auto_shoot_zone_y_pos.setSingleStep(0.05)
+        self.auto_shoot_zone_y_pos.setToolTip(
+            "Vertical position of the zone centre on the target detection box.\n"
+            "0.00 = top of the bounding box, 0.50 = centre, 1.00 = bottom.\n"
+            "0.30–0.40 is a good range for head / upper-chest targeting."
+        )
+        self.auto_shoot_zone_y_pos.valueChanged.connect(self._emit_change)
+        threshold_form.addRow("Zone Y position", self.auto_shoot_zone_y_pos)
 
         input_row_height = self.aim_mode.sizeHint().height()
         for checkbox in (
@@ -425,10 +442,14 @@ class CVRuleEditor(QtWidgets.QFrame):
         priority_text = f" | priority {self.priority.value()}"
         aim_cd = self.auto_shoot_aim_cooldown_ms.value()
         aim_cd_text = f" | aim cd {aim_cd}ms" if aim_cd > 0 else ""
+        zw = self.auto_shoot_zone_width.value()
+        zh = self.auto_shoot_zone_height.value()
+        zy = self.auto_shoot_zone_y_pos.value()
+        zone_text = f" | zone {zw}×{zh} @ y={zy:.2f}" if self.auto_shoot.isChecked() else ""
         type_text = f" | {self._target_type_value()}"
         scope_text = " | scoped only" if self.only_when_scoped_visual.isChecked() else ""
         spray_text = " | spray-align" if self.spray_target_offset_enabled.isChecked() else ""
-        self.summary.setText(f"{name} — {activation}{priority_text}{weapon_text}{type_text}{scope_text}{shoot_text}{spray_text}{aim_cd_text}")
+        self.summary.setText(f"{name} — {activation}{priority_text}{weapon_text}{type_text}{scope_text}{shoot_text}{spray_text}{aim_cd_text}{zone_text}")
 
     def rule_name(self) -> str:
         return self.name_edit.text().strip()
@@ -484,9 +505,9 @@ class CVRuleEditor(QtWidgets.QFrame):
             self.max_aim_speed_px.setValue(int(data.get("MAX_AIM_SPEED_PX", data.get("CONSTANT_SPEED_PX", 50))))
             self.smoothing_alpha.setValue(float(data.get("SMOOTHING_ALPHA", 0.0)))
             self.noise_amount.setValue(float(data.get("NOISE_AMOUNT", 0.0)))
-            self.cross_x_thresh.setValue(int(data.get("CROSS_X_THRESH", 14)))
-            self.cross_y_top.setValue(int(data.get("CROSS_Y_THRESH_TOP", 18)))
-            self.cross_y_bot.setValue(int(data.get("CROSS_Y_THRESH_BOT", 32)))
+            self.auto_shoot_zone_width.setValue(int(data.get("AUTO_SHOOT_ZONE_WIDTH", 28)))
+            self.auto_shoot_zone_height.setValue(int(data.get("AUTO_SHOOT_ZONE_HEIGHT", 36)))
+            self.auto_shoot_zone_y_pos.setValue(float(data.get("AUTO_SHOOT_ZONE_Y_POS", 0.35)))
             self._sync_header_title()
             self._update_activation_visibility()
         finally:
@@ -537,9 +558,9 @@ class CVRuleEditor(QtWidgets.QFrame):
         data.pop("SENS_COEFF", None)
         data.pop("CONFIDENCE", None)
         data.pop("IMG_SIZE", None)
-        data["CROSS_X_THRESH"] = self.cross_x_thresh.value()
-        data["CROSS_Y_THRESH_TOP"] = self.cross_y_top.value()
-        data["CROSS_Y_THRESH_BOT"] = self.cross_y_bot.value()
+        data["AUTO_SHOOT_ZONE_WIDTH"] = self.auto_shoot_zone_width.value()
+        data["AUTO_SHOOT_ZONE_HEIGHT"] = self.auto_shoot_zone_height.value()
+        data["AUTO_SHOOT_ZONE_Y_POS"] = self.auto_shoot_zone_y_pos.value()
         return self.rule_name(), data
 
     def _emit_change(self, *args) -> None:

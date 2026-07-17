@@ -113,15 +113,21 @@ def _auto_shoot_zone_contains_crosshair(
     *,
     box: tuple[int, int, int, int],
     crosshair: tuple[int, int],
-    cross_x: int,
-    cross_y_top: int,
-    cross_y_bot: int,
+    zone_width: int,
+    zone_height: int,
+    zone_y_pos: float,
 ) -> bool:
     x1, y1, x2, y2 = box
     cx, cy = crosshair
     box_cx = (x1 + x2) >> 1
-    box_cy = (y1 + y2) >> 1
-    return box_cx - cross_x <= cx <= box_cx + cross_x and box_cy - cross_y_top <= cy <= box_cy + cross_y_bot
+    box_h = y2 - y1
+    if box_h <= 0:
+        return False
+    zone_cy = y1 + int(box_h * zone_y_pos)
+    half_w = zone_width >> 1
+    half_h = zone_height >> 1
+    return (box_cx - half_w <= cx <= box_cx + half_w and
+            zone_cy - half_h <= cy <= zone_cy + half_h)
 
 
 def _shot_cooldown_active(*, now: float, cooldown_until: float) -> bool:
@@ -690,9 +696,9 @@ class CVTriggerComponent(BaseComponent):
                     aim_mode = str(cfg["AIM_MODE"]).lower()
                     snap_r2 = snap_distance * snap_distance
                     auto_shoot = _truthy(cfg.get("auto_shoot", True))
-                    cross_x = int(cfg["CROSS_X_THRESH"])
-                    cross_y_top = int(cfg["CROSS_Y_THRESH_TOP"])
-                    cross_y_bot = int(cfg["CROSS_Y_THRESH_BOT"])
+                    zone_width = int(cfg.get("AUTO_SHOOT_ZONE_WIDTH", 28))
+                    zone_height = int(cfg.get("AUTO_SHOOT_ZONE_HEIGHT", 36))
+                    zone_y_pos = float(cfg.get("AUTO_SHOOT_ZONE_Y_POS", 0.35))
 
                     left_button_held = activation.button_held("left")
                     spray_offset_x, spray_offset_y = self._spray_target_offset_for_rule(
@@ -772,9 +778,9 @@ class CVTriggerComponent(BaseComponent):
                         if _auto_shoot_zone_contains_crosshair(
                             box=box_tuple,
                             crosshair=(cx, cy),
-                            cross_x=cross_x,
-                            cross_y_top=cross_y_top,
-                            cross_y_bot=cross_y_bot,
+                            zone_width=zone_width,
+                            zone_height=zone_height,
+                            zone_y_pos=zone_y_pos,
                         ):
                             box_cx = (x1 + x2) >> 1
                             box_cy = (y1 + y2) >> 1

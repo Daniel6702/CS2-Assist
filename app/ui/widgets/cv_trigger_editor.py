@@ -327,9 +327,9 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
                         "MAX_AIM_SPEED_PX": 50,
                         "SMOOTHING_ALPHA": 0.0,
                         "NOISE_AMOUNT": 0.0,
-                        "CROSS_X_THRESH": 14,
-                        "CROSS_Y_THRESH_TOP": 18,
-                        "CROSS_Y_THRESH_BOT": 32,
+                        "AUTO_SHOOT_ZONE_WIDTH": 28,
+                        "AUTO_SHOOT_ZONE_HEIGHT": 36,
+                        "AUTO_SHOOT_ZONE_Y_POS": 0.35,
                     },
                     emit_change=False,
                 )
@@ -400,9 +400,9 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
                 "MAX_AIM_SPEED_PX": 50,
                 "SMOOTHING_ALPHA": 0.0,
                 "NOISE_AMOUNT": 0.0,
-                "CROSS_X_THRESH": 14,
-                "CROSS_Y_THRESH_TOP": 18,
-                "CROSS_Y_THRESH_BOT": 32,
+                "AUTO_SHOOT_ZONE_WIDTH": 28,
+                "AUTO_SHOOT_ZONE_HEIGHT": 36,
+                "AUTO_SHOOT_ZONE_Y_POS": 0.35,
             },
         )
 

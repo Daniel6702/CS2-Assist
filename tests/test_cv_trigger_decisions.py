@@ -29,9 +29,9 @@ class CVTriggerDecisionTests(unittest.TestCase):
             _auto_shoot_zone_contains_crosshair(
                 box=box,
                 crosshair=crosshair,
-                cross_x=1,
-                cross_y_top=1,
-                cross_y_bot=1,
+                zone_width=2,
+                zone_height=2,
+                zone_y_pos=0.50,
             )
         )
         head_x, head_y = _aim_point_for_box(

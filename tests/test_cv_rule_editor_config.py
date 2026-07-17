@@ -50,9 +50,9 @@ def _canonical_rule() -> dict[str, Any]:
         "SNAP_DISTANCE": 250,
         "SMOOTHING_ALPHA": 0.2,
         "NOISE_AMOUNT": 2.5,
-        "CROSS_X_THRESH": 14,
-        "CROSS_Y_THRESH_TOP": 18,
-        "CROSS_Y_THRESH_BOT": 32,
+        "AUTO_SHOOT_ZONE_WIDTH": 28,
+        "AUTO_SHOOT_ZONE_HEIGHT": 36,
+        "AUTO_SHOOT_ZONE_Y_POS": 0.35,
     }
 
 

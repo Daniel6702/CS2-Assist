@@ -39,7 +39,7 @@ class SharedSettingsTab(BaseTab):
         self.shared_game_sensitivity.setRange(0.01, 50.0)
         self.shared_game_sensitivity.setDecimals(4)
         self.shared_game_sensitivity.setSingleStep(0.01)
-        shared_layout.addRow("Game / program sensitivity", self.shared_game_sensitivity)
+        shared_layout.addRow("Game Sensitivity", self.shared_game_sensitivity)
 
         self.shared_game_width = QtWidgets.QSpinBox()
         self.shared_game_width.setRange(1, 100000)
@@ -55,7 +55,7 @@ class SharedSettingsTab(BaseTab):
         resolution_layout.addWidget(QtWidgets.QLabel("Height"))
         resolution_layout.addWidget(self.shared_game_height)
         resolution_layout.addStretch(1)
-        shared_layout.addRow("In-game resolution", resolution_row)
+        shared_layout.addRow("Game Resolution", resolution_row)
 
         layout.addWidget(shared_group)
 
