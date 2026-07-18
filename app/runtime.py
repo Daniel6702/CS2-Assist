@@ -6,7 +6,7 @@ from typing import Any, Callable
 from app.components.base import BaseComponent
 from app.components.bhop import BhopComponent
 from app.components.counter_strafe import CounterStrafeComponent
-from app.components import CVTriggerComponent
+from app.components import CVTriggerComponent, KillSoundComponent
 from app.components.pixel_trigger import PixelTriggerComponent
 from app.components.recoil import RecoilComponent
 from app.components.snap_tap import SnapTapComponent
@@ -24,6 +24,7 @@ class RuntimeManager:
             "recoil": RecoilComponent(),
             "pixel_trigger": PixelTriggerComponent(),
             "cv_trigger": CVTriggerComponent(),
+            "kill_sound": KillSoundComponent(),
         }
         for component in self.components.values():
             component.set_status_callback(self.status_callback)

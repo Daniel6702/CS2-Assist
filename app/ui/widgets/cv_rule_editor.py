@@ -227,11 +227,11 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.auto_shoot_aim_cooldown_ms.setRange(0, 5000)
         self.auto_shoot_aim_cooldown_ms.setSuffix(" ms")
         self.auto_shoot_aim_cooldown_ms.setToolTip(
-            "After an auto shot or manual click, disable aim assist (mouse movement) "
+            "After a kill is detected via GSI, disable aim assist (mouse movement) "
             "for this rule for this many ms.  0 = disabled."
         )
         self.auto_shoot_aim_cooldown_ms.valueChanged.connect(self._emit_change)
-        targeting_form.addRow("Aim assist cooldown", self.auto_shoot_aim_cooldown_ms)
+        targeting_form.addRow("Kill cooldown", self.auto_shoot_aim_cooldown_ms)
 
         timing_group = QtWidgets.QGroupBox("Auto Shoot")
         timing_layout = QtWidgets.QHBoxLayout(timing_group)
@@ -441,7 +441,7 @@ class CVRuleEditor(QtWidgets.QFrame):
         shoot_text = " | auto shoot" if self.auto_shoot.isChecked() else " | aim only"
         priority_text = f" | priority {self.priority.value()}"
         aim_cd = self.auto_shoot_aim_cooldown_ms.value()
-        aim_cd_text = f" | aim cd {aim_cd}ms" if aim_cd > 0 else ""
+        aim_cd_text = f" | kill cd {aim_cd}ms" if aim_cd > 0 else ""
         zw = self.auto_shoot_zone_width.value()
         zh = self.auto_shoot_zone_height.value()
         zy = self.auto_shoot_zone_y_pos.value()

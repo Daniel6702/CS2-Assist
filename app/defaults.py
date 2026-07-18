@@ -115,6 +115,11 @@ def default_profile() -> dict[str, Any]:
                 "x": None,
                 "y": None,
             },
+            "kill_sound": {
+                "enabled": False,
+                "sound_file": "",
+                "volume": 50,
+            },
             "cv_trigger": {
                 "enabled": False,
                 "model_path": str(MODEL_FILE),

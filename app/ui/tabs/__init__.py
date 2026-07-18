@@ -5,6 +5,7 @@ from app.ui.tabs.recoil_tab import RecoilTab
 from app.ui.tabs.pixel_trigger_tab import PixelTriggerTab
 from app.ui.tabs.cv_trigger_tab import CVTriggerTab
 from app.ui.tabs.log_tab import LogTab
+from app.ui.tabs.sound_tab import SoundTab
 
 __all__ = [
     "BaseTab",
@@ -14,4 +15,5 @@ __all__ = [
     "PixelTriggerTab",
     "CVTriggerTab",
     "LogTab",
+    "SoundTab",
 ]

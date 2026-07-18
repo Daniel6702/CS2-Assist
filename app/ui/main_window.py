@@ -20,6 +20,7 @@ from app.ui.tabs import (
     PixelTriggerTab,
     RecoilTab,
     SharedSettingsTab,
+    SoundTab,
 )
 from app.ui.widgets.bullet_overlay import BulletImpactOverlay
 from app.ui.widgets.log_bridge import LogBridge
@@ -131,10 +132,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.recoil_tab = RecoilTab(self.device_service)
         self.pixel_trigger_tab = PixelTriggerTab(self.device_service)
         self.cv_trigger_tab = CVTriggerTab(self.device_service)
+        self.sound_tab = SoundTab()
         self.log_tab = LogTab()
 
         self.tabs.addTab(self.shared_settings_tab, "Shared Settings")
         self.tabs.addTab(self.cv_trigger_tab, "CV Aim Assist")
+        self.tabs.addTab(self.sound_tab, "Sound")
         self.tabs.addTab(self.recoil_tab, "Recoil")
         self.tabs.addTab(self.pixel_trigger_tab, "Pixel Trigger")
         self.tabs.addTab(self.movement_tab, "Movement")
@@ -175,6 +178,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.recoil_tab.config_changed.connect(self._on_component_config_changed)
         self.pixel_trigger_tab.editor.config_changed.connect(self._on_component_config_changed)
         self.cv_trigger_tab.editor.config_changed.connect(self._on_component_config_changed)
+        self.sound_tab.config_changed.connect(self._on_component_config_changed)
 
     def _bullet_overlay_settings(self) -> dict[str, Any]:
         overlay = dict(deep_get(self.current_profile_data, "components.recoil.overlay", {}) or {})
@@ -303,6 +307,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.recoil_tab.load_config(deep_get(self.current_profile_data, "components.recoil", {}))
             self.pixel_trigger_tab.load_config(deep_get(self.current_profile_data, "components.pixel_trigger", {}))
             self.cv_trigger_tab.load_config(deep_get(self.current_profile_data, "components.cv_trigger", {}))
+            self.sound_tab.load_config(deep_get(self.current_profile_data, "components.kill_sound", {}))
             self._movement_hotkey_disabled.clear()
             self._configure_hotkeys()
         finally:
@@ -338,6 +343,7 @@ class MainWindow(QtWidgets.QMainWindow):
             ("recoil", self.recoil_tab),
             ("pixel_trigger", self.pixel_trigger_tab),
             ("cv_trigger", self.cv_trigger_tab),
+            ("kill_sound", self.sound_tab),
         ]:
             extracted = editor.extract_config()
             if name == "cv_trigger":

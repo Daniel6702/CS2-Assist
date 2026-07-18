@@ -212,6 +212,8 @@ class CVTriggerComponent(BaseComponent):
         self._shots_fired: int | None = None
         self._last_shots_change_at: float | None = None
         self._current_player_side: str | None = None
+        self._last_kills: int | None = None
+        self._pending_kill_event: bool = False
         self._overlay_lock = threading.RLock()
         self._overlay_active = False
         self._overlay_offset_x = 0.0
@@ -238,6 +240,21 @@ class CVTriggerComponent(BaseComponent):
             if weapon_changed or new_shots_fired != self._shots_fired:
                 self._last_shots_change_at = now
             self._shots_fired = new_shots_fired
+
+            # Track kills via GSI match_stats — set a flag when kills increase
+            new_kills = state.kills
+            if new_kills is not None:
+                if self._last_kills is not None and new_kills > self._last_kills:
+                    self._pending_kill_event = True
+                self._last_kills = new_kills
+
+    def _consume_kill_event(self) -> bool:
+        """Check and clear the pending kill event flag (thread-safe)."""
+        with self._gsi_lock:
+            if self._pending_kill_event:
+                self._pending_kill_event = False
+                return True
+            return False
 
     def _current_weapon_name(self) -> str | None:
         with self._gsi_lock:
@@ -615,8 +632,8 @@ class CVTriggerComponent(BaseComponent):
                     self._set_overlay_state(False)
                     continue
 
-                # Detect manual left-click and apply aim cooldown to all active rules
-                if activation.consume_button_press("left"):
+                # Detect kill via GSI and apply aim cooldown to all active rules
+                if self._consume_kill_event():
                     _now = time.time()
                     for name in active_names:
                         cfg = enabled_configs[name]
@@ -967,9 +984,6 @@ class CVTriggerComponent(BaseComponent):
                         base_cooldown = float(triggered_cfg["COOLDOWN_MS"]) / 1000.0
                         cooldown_until[triggered_name] = best_click["now"] + humanize_jitter(base_cooldown, fraction=_cooldown_frac if _enabled else 0.0, min_val=0.01)
                         settle[triggered_name] = 0
-                        aim_cd_ms = float(triggered_cfg.get("auto_shoot_aim_cooldown_ms", 0))
-                        if aim_cd_ms > 0:
-                            aim_cooldown_until[triggered_name] = best_click["now"] + aim_cd_ms / 1000.0
 
         except Exception as exc:
             self.status(str(exc), "error")

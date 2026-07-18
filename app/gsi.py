@@ -33,6 +33,7 @@ class GameState:
     round_phase: str | None
     map_name: str | None
     features_allowed: bool
+    kills: int | None
 
     @classmethod
     def from_payload(cls, payload: dict) -> "GameState":
@@ -87,6 +88,9 @@ class GameState:
         # player is alive. Unknown / missing state should not enable features.
         features_allowed = player_alive is True
 
+        player_stats = player.get("match_stats", {}) or {}
+        kills = _parse_int(player_stats.get("kills"))
+
         return cls(
             raw=payload,
             current_weapon=active_weapon_name,
@@ -96,6 +100,7 @@ class GameState:
             round_phase=round_phase,
             map_name=map_name,
             features_allowed=features_allowed,
+            kills=kills,
         )
 
 
