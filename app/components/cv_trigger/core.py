@@ -18,7 +18,7 @@ from .activation import (
     key_to_name,
 )
 from .capture import Grab
-from .detection import ScopeDetector, XAxisPredictor
+from .detection import PositionSmoother, ScopeDetector
 from .migration import _migrate_legacy_config
 from .patterns import (
     PATTERNS_FILE,
@@ -479,14 +479,7 @@ class CVTriggerComponent(BaseComponent):
         near_smoothing_alpha = float(config.get("near_smoothing_alpha", 0.35) or 0.35)
         near_smoothing_alpha = max(0.05, min(1.0, near_smoothing_alpha))
         near_smoothing_radius_px = float(config.get("near_smoothing_radius_px", 32.0) or 32.0)
-        x_prediction_enabled = _truthy(config.get("x_prediction_enabled", False))
-        x_prediction_lead_ms = float(config.get("x_prediction_lead_ms", 28.0) or 28.0)
-        x_prediction_history_ms = float(config.get("x_prediction_history_ms", 90.0) or 90.0)
-        x_prediction_damping = float(config.get("x_prediction_damping", 0.35) or 0.35)
-        x_prediction_damping = max(0.0, min(1.0, x_prediction_damping))
-        x_prediction_max_delta_px = float(config.get("x_prediction_max_delta_px", 36.0) or 36.0)
-        x_prediction_min_samples = max(2, int(config.get("x_prediction_min_samples", 3) or 3))
-        x_prediction_reset_px = float(config.get("x_prediction_reset_px", 120.0) or 120.0)
+        position_smoothing_frames = max(1, int(config.get("position_smoothing_frames", 3) or 3))
         anti_oscillation_radius_raw = config.get("anti_oscillation_radius_px", 24.0)
         anti_oscillation_reserve_raw = config.get("anti_oscillation_reserve_counts", 1)
         anti_oscillation_lock_raw = config.get("anti_oscillation_lock_frames", 2)
@@ -552,7 +545,7 @@ class CVTriggerComponent(BaseComponent):
             humanize_sleep(0.01, fraction=_sleep_frac if _enabled else 0.0, min_val=0.005)
 
         scope_detector = ScopeDetector()
-        x_predictor = XAxisPredictor()
+        pos_smoother = PositionSmoother(alpha=2.0 / (max(1, int(position_smoothing_frames)) + 1.0))
 
         settle: dict[str, int] = {name: 0 for name in enabled_configs}
         cooldown_until: dict[str, float] = {name: 0.0 for name in enabled_configs}
@@ -562,10 +555,6 @@ class CVTriggerComponent(BaseComponent):
         reversal_locks: dict[str, int] = {name: 0 for name in enabled_configs}
         previous_active: tuple[str, ...] = ()
         status_every = 0.0
-
-        session_lead_ms = humanize_jitter(x_prediction_lead_ms, fraction=_pred_frac if _enabled else 0.0, min_val=5.0)
-        session_history_ms = humanize_jitter(x_prediction_history_ms, fraction=_pred_frac if _enabled else 0.0, min_val=30.0)
-        session_damping = humanize_jitter(x_prediction_damping, fraction=_pred_frac if _enabled else 0.0, min_val=0.10, max_val=0.90)
 
         try:
             while not self._stop.is_set():
@@ -582,7 +571,7 @@ class CVTriggerComponent(BaseComponent):
                         per_rule_smooth.pop(name, None)
                         raw_error_signs[name] = None
                         reversal_locks[name] = 0
-                    x_predictor.reset_many(settle.keys())
+                    pos_smoother.reset_many(settle.keys())
                     previous_active = ()
                     self._set_overlay_state(False)
                     humanize_sleep(0.01, fraction=_sleep_frac if _enabled else 0.0, min_val=0.005)
@@ -609,7 +598,7 @@ class CVTriggerComponent(BaseComponent):
                         per_rule_smooth.pop(name, None)
                         raw_error_signs[name] = None
                         reversal_locks[name] = 0
-                        x_predictor.reset(name)
+                        pos_smoother.reset(name)
 
                 if tuple(active_names) != previous_active:
                     previous_active = tuple(active_names)
@@ -681,7 +670,7 @@ class CVTriggerComponent(BaseComponent):
                         filtered_error[name] = None
                         raw_error_signs[name] = None
                         reversal_locks[name] = 0
-                        x_predictor.reset(name)
+                        pos_smoother.reset(name)
                         continue
 
                     aim_strength = float(cfg.get("AIM_STRENGTH", 0.5))
@@ -796,23 +785,17 @@ class CVTriggerComponent(BaseComponent):
                         per_rule_smooth.pop(name, None)
                         raw_error_signs[name] = None
                         reversal_locks[name] = 0
-                        x_predictor.reset(name)
+                        pos_smoother.reset(name)
                         continue
 
                     if best_movement is not None:
-                        target_tx = x_predictor.predict(
-                            name,
-                            float(best_movement["target_tx"]),
-                            time.perf_counter(),
-                            enabled=x_prediction_enabled,
-                            history_ms=session_history_ms,
-                            min_samples=x_prediction_min_samples,
-                            lead_ms=session_lead_ms,
-                            damping=session_damping,
-                            max_delta_px=x_prediction_max_delta_px,
-                            reset_distance_px=x_prediction_reset_px,
-                        )
-                        target_ty = float(best_movement["target_ty"])
+                        raw_tx = float(best_movement["target_tx"])
+                        raw_ty = float(best_movement["target_ty"])
+                        # Smooth raw detections to dampen YOLO bounding-box jitter
+                        smooth_tx, smooth_ty = pos_smoother.smooth(name, raw_tx, raw_ty)
+
+                        target_tx = smooth_tx
+                        target_ty = smooth_ty
                         pred_bullet_cx = float(best_movement["pred_bullet_cx"])
                         pred_bullet_cy = float(best_movement["pred_bullet_cy"])
 
@@ -909,7 +892,7 @@ class CVTriggerComponent(BaseComponent):
                         per_rule_smooth.pop(name, None)
                         raw_error_signs[name] = None
                         reversal_locks[name] = 0
-                        x_predictor.reset(name)
+                        pos_smoother.reset(name)
 
                     if best_click is not None:
                         threshold = max(1, int(cfg["SETTLE_FRAMES"]))
@@ -965,7 +948,7 @@ class CVTriggerComponent(BaseComponent):
                             filtered_error[m["name"]] = None
                             raw_error_signs[m["name"]] = None
                             reversal_locks[m["name"]] = 0
-                            x_predictor.reset(m["name"])
+                            pos_smoother.reset(m["name"])
                     mdx, mdy = _sum_motion_counts(motions)
                     if mdx or mdy:
                         if _eased and (abs(mdx) > 15 or abs(mdy) > 15):

@@ -53,7 +53,7 @@
             "enabled": false
         },
         "counter_strafe": {
-            "enabled": true,
+            "enabled": false,
             "base_counter_ms": 100,
             "full_speed_ms": 180,
             "min_counter_ms": 8,
@@ -126,7 +126,7 @@
                 "weapon_ump45": "UMP"
             },
             "noise": {
-                "strength_px": 1.0
+                "strength_px": 0.0
             },
             "overlay": {
                 "enabled": true,
@@ -309,8 +309,8 @@
             "configs": {
                 "Rifle": {
                     "AIM_CURVE_ID": "rifle",
-                    "AIM_MODE": "body",
-                    "AIM_STRENGTH": 0.7,
+                    "AIM_MODE": "head",
+                    "AIM_STRENGTH": 0.6,
                     "AUTO_SHOOT_ZONE_HEIGHT": 36,
                     "AUTO_SHOOT_ZONE_WIDTH": 28,
                     "AUTO_SHOOT_ZONE_Y_POS": 0.35,
@@ -322,7 +322,7 @@
                     "NOISE_AMOUNT": 1.0,
                     "SETTLE_FRAMES": 2,
                     "SMOOTHING_ALPHA": 0.5,
-                    "SNAP_DISTANCE": 80,
+                    "SNAP_DISTANCE": 70,
                     "activation": {
                         "mode": "always"
                     },
@@ -346,7 +346,7 @@
                 "Rifle_Shooting": {
                     "AIM_CURVE_ID": "constant_50",
                     "AIM_MODE": "head",
-                    "AIM_STRENGTH": 0.8,
+                    "AIM_STRENGTH": 0.85,
                     "AUTO_SHOOT_ZONE_HEIGHT": 36,
                     "AUTO_SHOOT_ZONE_WIDTH": 28,
                     "AUTO_SHOOT_ZONE_Y_POS": 0.35,
@@ -445,17 +445,13 @@
             "enabled": true,
             "inference_confidence": 0.15,
             "inference_img_size": 512,
-            "jitter_deadzone_px": 3.0,
+            "jitter_deadzone_px": 2.0,
             "manual_target_side": "both",
             "model_path": "/home/Daniel6702/Applications/cs2/CS2-Assist/CS2-Assist/resources/best.pt",
             "near_smoothing_alpha": 0.35,
             "near_smoothing_radius_px": 32.0,
-            "use_gsi_opponent_side": false,
-            "x_prediction_damping": 0.8,
-            "x_prediction_enabled": true,
-            "x_prediction_history_ms": 150.0,
-            "x_prediction_lead_ms": 100.0,
-            "x_prediction_max_delta_px": 200.0
+            "position_smoothing_frames": 3,
+            "use_gsi_opponent_side": false
         }
     }
 }

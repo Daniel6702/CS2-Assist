@@ -10,7 +10,7 @@ from .activation import (
 )
 from .capture import Grab
 from .core import CVTriggerComponent
-from .detection import ScopeDetector, XAxisPredictor
+from .detection import PositionSmoother, ScopeDetector
 from .migration import _migrate_legacy_config
 from .patterns import (
     _infer_target_type_from_legacy_classes,
@@ -24,9 +24,9 @@ __all__ = [
     "ActivationState",
     "CVTriggerComponent",
     "Grab",
+    "PositionSmoother",
     "ScopeDetector",
     "VirtualMouse",
-    "XAxisPredictor",
     "_infer_target_type_from_legacy_classes",
     "_infer_target_type_from_rule_ui",
     "_migrate_legacy_config",

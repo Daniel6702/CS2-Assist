@@ -142,7 +142,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         tuning_row.setSpacing(12)
         outer.addLayout(tuning_row)
 
-        detection_group = QtWidgets.QGroupBox("Stability Tuning")
+        detection_group = QtWidgets.QGroupBox("Stability &&38; Smoothing")
         detection_form = QtWidgets.QFormLayout(detection_group)
         detection_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         detection_form.setHorizontalSpacing(12)
@@ -170,44 +170,19 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         self.near_smoothing_radius_px.valueChanged.connect(self._emit_change)
         detection_form.addRow("Near smoothing radius (px)", self.near_smoothing_radius_px)
 
-        prediction_group = QtWidgets.QGroupBox("Horizontal Prediction")
-        prediction_form = QtWidgets.QFormLayout(prediction_group)
-        prediction_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
-        prediction_form.setHorizontalSpacing(12)
-        prediction_form.setVerticalSpacing(6)
-        tuning_row.addWidget(prediction_group, 1)
-
-        self.x_prediction_enabled = QtWidgets.QCheckBox()
-        self.x_prediction_enabled.stateChanged.connect(self._emit_change)
-        prediction_form.addRow("Predict horizontal motion", self.x_prediction_enabled)
-
-        self.x_prediction_lead_ms = QtWidgets.QDoubleSpinBox()
-        self.x_prediction_lead_ms.setRange(0.0, 250.0)
-        self.x_prediction_lead_ms.setDecimals(1)
-        self.x_prediction_lead_ms.setSingleStep(1.0)
-        self.x_prediction_lead_ms.valueChanged.connect(self._emit_change)
-        prediction_form.addRow("Prediction lead (ms)", self.x_prediction_lead_ms)
-
-        self.x_prediction_history_ms = QtWidgets.QDoubleSpinBox()
-        self.x_prediction_history_ms.setRange(10.0, 500.0)
-        self.x_prediction_history_ms.setDecimals(1)
-        self.x_prediction_history_ms.setSingleStep(5.0)
-        self.x_prediction_history_ms.valueChanged.connect(self._emit_change)
-        prediction_form.addRow("Prediction history (ms)", self.x_prediction_history_ms)
-
-        self.x_prediction_damping = QtWidgets.QDoubleSpinBox()
-        self.x_prediction_damping.setRange(0.0, 1.0)
-        self.x_prediction_damping.setDecimals(3)
-        self.x_prediction_damping.setSingleStep(0.05)
-        self.x_prediction_damping.valueChanged.connect(self._emit_change)
-        prediction_form.addRow("Prediction damping", self.x_prediction_damping)
-
-        self.x_prediction_max_delta_px = QtWidgets.QDoubleSpinBox()
-        self.x_prediction_max_delta_px.setRange(0.0, 500.0)
-        self.x_prediction_max_delta_px.setDecimals(1)
-        self.x_prediction_max_delta_px.setSingleStep(1.0)
-        self.x_prediction_max_delta_px.valueChanged.connect(self._emit_change)
-        prediction_form.addRow("Max predicted X shift (px)", self.x_prediction_max_delta_px)
+        self.position_smoothing_frames = QtWidgets.QSpinBox()
+        self.position_smoothing_frames.setRange(1, 15)
+        self.position_smoothing_frames.setSingleStep(1)
+        self.position_smoothing_frames.setToolTip(
+            "Number of recent detection frames averaged together (exponential moving average) "
+            "before the aim position enters the predictor.  Higher values = smoother but "
+            "slightly more lag on sharp direction changes.\n\n"
+            "1 = no smoothing (raw YOLO positions)\n"
+            "3 = moderate (default — good balance)\n"
+            "5+ = heavy smoothing (use when output is very noisy)"
+        )
+        self.position_smoothing_frames.valueChanged.connect(self._emit_change)
+        detection_form.addRow("Position smoothing (frames)", self.position_smoothing_frames)
 
         anti_oscillation_group = QtWidgets.QGroupBox("Anti-Oscillation")
         anti_oscillation_form = QtWidgets.QFormLayout(anti_oscillation_group)
@@ -293,11 +268,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
             self.jitter_deadzone_px.setValue(float(data.get("jitter_deadzone_px", 2.0) or 2.0))
             self.near_smoothing_alpha.setValue(float(data.get("near_smoothing_alpha", 0.35) or 0.35))
             self.near_smoothing_radius_px.setValue(float(data.get("near_smoothing_radius_px", 32.0) or 32.0))
-            self.x_prediction_enabled.setChecked(bool(data.get("x_prediction_enabled", False)))
-            self.x_prediction_lead_ms.setValue(float(data.get("x_prediction_lead_ms", 28.0) or 28.0))
-            self.x_prediction_history_ms.setValue(float(data.get("x_prediction_history_ms", 90.0) or 90.0))
-            self.x_prediction_damping.setValue(float(data.get("x_prediction_damping", 0.35) or 0.35))
-            self.x_prediction_max_delta_px.setValue(float(data.get("x_prediction_max_delta_px", 36.0) or 36.0))
+            self.position_smoothing_frames.setValue(int(data.get("position_smoothing_frames", 3) or 3))
             self.anti_oscillation_radius_px.setValue(float(data.get("anti_oscillation_radius_px", 24.0) or 0.0))
             self.anti_oscillation_reserve_counts.setValue(int(data.get("anti_oscillation_reserve_counts", 1) or 0))
             self.anti_oscillation_lock_frames.setValue(int(data.get("anti_oscillation_lock_frames", 2) or 0))
@@ -348,11 +319,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
             "jitter_deadzone_px": self.jitter_deadzone_px.value(),
             "near_smoothing_alpha": self.near_smoothing_alpha.value(),
             "near_smoothing_radius_px": self.near_smoothing_radius_px.value(),
-            "x_prediction_enabled": self.x_prediction_enabled.isChecked(),
-            "x_prediction_lead_ms": self.x_prediction_lead_ms.value(),
-            "x_prediction_history_ms": self.x_prediction_history_ms.value(),
-            "x_prediction_damping": self.x_prediction_damping.value(),
-            "x_prediction_max_delta_px": self.x_prediction_max_delta_px.value(),
+            "position_smoothing_frames": self.position_smoothing_frames.value(),
             "anti_oscillation_radius_px": self.anti_oscillation_radius_px.value(),
             "anti_oscillation_reserve_counts": self.anti_oscillation_reserve_counts.value(),
             "anti_oscillation_lock_frames": self.anti_oscillation_lock_frames.value(),
