@@ -6,7 +6,7 @@ from typing import Any, Callable
 from app.components.base import BaseComponent
 from app.components.bhop import BhopComponent
 from app.components.counter_strafe import CounterStrafeComponent
-from app.components import CVTriggerComponent, KillSoundComponent
+from app.components import BombTimerComponent, CVTriggerComponent, KillSoundComponent
 from app.components.pixel_trigger import PixelTriggerComponent
 from app.components.recoil import RecoilComponent
 from app.components.snap_tap import SnapTapComponent
@@ -25,6 +25,7 @@ class RuntimeManager:
             "pixel_trigger": PixelTriggerComponent(),
             "cv_trigger": CVTriggerComponent(),
             "kill_sound": KillSoundComponent(),
+            "bomb_timer": BombTimerComponent(),
         }
         for component in self.components.values():
             component.set_status_callback(self.status_callback)
@@ -58,12 +59,14 @@ class RuntimeManager:
             sensitivity["program_sens"] = game_sensitivity
             cfg["sensitivity"] = sensitivity
 
-        if name == "cv_trigger":
-            cfg["user_sens"] = game_sensitivity
+        if name in {"cv_trigger", "bomb_timer"}:
             cfg["game_resolution"] = {
                 "width": max(1, int(game_resolution.get("width", 1600) or 1600)),
                 "height": max(1, int(game_resolution.get("height", 1200) or 1200)),
             }
+
+        if name == "cv_trigger":
+            cfg["user_sens"] = game_sensitivity
             cfg["monitor"] = default_monitor_geometry().as_capture_dict()
             recoil_cfg = deepcopy(dict(components_cfg.get("recoil", {})))
             recoil_sens = recoil_cfg.get("sensitivity", {})

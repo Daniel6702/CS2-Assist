@@ -34,6 +34,8 @@ class GameState:
     map_name: str | None
     features_allowed: bool
     kills: int | None
+    team: str | None
+    defusekit: bool | None
 
     @classmethod
     def from_payload(cls, payload: dict) -> "GameState":
@@ -88,6 +90,18 @@ class GameState:
         # player is alive. Unknown / missing state should not enable features.
         features_allowed = player_alive is True
 
+        team = player.get("team")
+        if isinstance(team, str):
+            team = team.strip().upper()
+
+        defusekit = player_state.get("defusekit")
+        if isinstance(defusekit, bool):
+            defusekit_bool = defusekit
+        elif isinstance(defusekit, str):
+            defusekit_bool = defusekit.strip().lower() in ("true", "1", "yes")
+        else:
+            defusekit_bool = None
+
         player_stats = player.get("match_stats", {}) or {}
         kills = _parse_int(player_stats.get("kills"))
 
@@ -101,6 +115,8 @@ class GameState:
             map_name=map_name,
             features_allowed=features_allowed,
             kills=kills,
+            team=team,
+            defusekit=defusekit_bool,
         )
 
 

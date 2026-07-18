@@ -120,6 +120,18 @@ def default_profile() -> dict[str, Any]:
                 "sound_file": "",
                 "volume": 50,
             },
+            "bomb_timer": {
+                "enabled": False,
+                "defuse_warning_enabled": True,
+                "overlay_font_size": 48,
+                "overlay_color": "#FF3232",
+                "warning_10s_enabled": True,
+                "warning_10s_file": "",
+                "warning_10s_volume": 50,
+                "warning_5s_enabled": True,
+                "warning_5s_file": "",
+                "warning_5s_volume": 50,
+            },
             "cv_trigger": {
                 "enabled": False,
                 "model_path": str(MODEL_FILE),

@@ -16,12 +16,13 @@ from app.ui.schemas import component_schemas
 from app.ui.tabs import (
     CVTriggerTab,
     LogTab,
+    MiscTab,
     MovementTab,
     PixelTriggerTab,
     RecoilTab,
     SharedSettingsTab,
-    SoundTab,
 )
+from app.ui.widgets.bomb_timer_overlay import BombTimerOverlay
 from app.ui.widgets.bullet_overlay import BulletImpactOverlay
 from app.ui.widgets.log_bridge import LogBridge
 
@@ -58,8 +59,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.hotkeys = HotkeyBridge(self)
         self.hotkeys.activated.connect(self._on_hotkey_activated)
         self.bullet_overlay = BulletImpactOverlay()
+        self.bomb_timer_overlay = BombTimerOverlay()
         self.overlay_timer = QtCore.QTimer(self)
         self.overlay_timer.timeout.connect(self._tick_bullet_overlay)
+        self.overlay_timer.timeout.connect(self._tick_bomb_timer)
 
         self.current_profile_name = "Default"
         self.current_profile_data = self.profile_store.load_profile(self.current_profile_name)
@@ -132,12 +135,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.recoil_tab = RecoilTab(self.device_service)
         self.pixel_trigger_tab = PixelTriggerTab(self.device_service)
         self.cv_trigger_tab = CVTriggerTab(self.device_service)
-        self.sound_tab = SoundTab()
+        self.misc_tab = MiscTab()
         self.log_tab = LogTab()
 
         self.tabs.addTab(self.shared_settings_tab, "Shared Settings")
         self.tabs.addTab(self.cv_trigger_tab, "CV Aim Assist")
-        self.tabs.addTab(self.sound_tab, "Sound")
+        self.tabs.addTab(self.misc_tab, "Misc")
         self.tabs.addTab(self.recoil_tab, "Recoil")
         self.tabs.addTab(self.pixel_trigger_tab, "Pixel Trigger")
         self.tabs.addTab(self.movement_tab, "Movement")
@@ -178,7 +181,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.recoil_tab.config_changed.connect(self._on_component_config_changed)
         self.pixel_trigger_tab.editor.config_changed.connect(self._on_component_config_changed)
         self.cv_trigger_tab.editor.config_changed.connect(self._on_component_config_changed)
-        self.sound_tab.config_changed.connect(self._on_component_config_changed)
+        self.misc_tab.config_changed.connect(self._on_component_config_changed)
 
     def _bullet_overlay_settings(self) -> dict[str, Any]:
         overlay = dict(deep_get(self.current_profile_data, "components.recoil.overlay", {}) or {})
@@ -253,6 +256,39 @@ class MainWindow(QtWidgets.QMainWindow):
         bullet_y = top + mon_height / 2.0 - (mouse_y / base_sens_mult_y) * float(settings["screen_scale"])
         self.bullet_overlay.show_point(bullet_x, bullet_y)
 
+    def _tick_bomb_timer(self) -> None:
+        if self._closing:
+            return
+
+        component = self.runtime.components.get("bomb_timer")
+        bomb_active = False
+        remaining = 0
+        team = None
+        defusekit = None
+        warn_enabled = True
+        font_size = 48
+        color_str = "#FF3232"
+
+        if component is not None and component.enabled:
+            state = component.get_state()
+            bomb_active = bool(state.get("bomb_planted", False))
+            remaining = int(state.get("remaining", 0))
+            team = state.get("team")
+            defusekit = state.get("defusekit")
+            cfg = component.config
+            warn_enabled = bool(cfg.get("defuse_warning_enabled", True))
+            font_size = int(cfg.get("overlay_font_size", 48))
+            color_str = str(cfg.get("overlay_color", "#FF3232"))
+
+        show_warning = False
+        if warn_enabled and bomb_active and team == "CT":
+            defuse_limit = 5 if defusekit else 10
+            show_warning = remaining < defuse_limit
+
+        self.bomb_timer_overlay.update_state(
+            bomb_active, remaining, show_warning, font_size, color_str,
+        )
+
     def _runtime_status(self, source: str, message: str) -> None:
         if self._closing or not hasattr(self, "current_profile_data"):
             return
@@ -307,7 +343,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.recoil_tab.load_config(deep_get(self.current_profile_data, "components.recoil", {}))
             self.pixel_trigger_tab.load_config(deep_get(self.current_profile_data, "components.pixel_trigger", {}))
             self.cv_trigger_tab.load_config(deep_get(self.current_profile_data, "components.cv_trigger", {}))
-            self.sound_tab.load_config(deep_get(self.current_profile_data, "components.kill_sound", {}))
+            self.misc_tab.load_config("kill_sound", deep_get(self.current_profile_data, "components.kill_sound", {}))
+            self.misc_tab.load_config("bomb_timer", deep_get(self.current_profile_data, "components.bomb_timer", {}))
             self._movement_hotkey_disabled.clear()
             self._configure_hotkeys()
         finally:
@@ -343,7 +380,6 @@ class MainWindow(QtWidgets.QMainWindow):
             ("recoil", self.recoil_tab),
             ("pixel_trigger", self.pixel_trigger_tab),
             ("cv_trigger", self.cv_trigger_tab),
-            ("kill_sound", self.sound_tab),
         ]:
             extracted = editor.extract_config()
             if name == "cv_trigger":
@@ -352,6 +388,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 existing = deep_get(self.current_profile_data, f"components.{name}", {})
                 cfg = _deep_merge_preserving_hidden(existing if isinstance(existing, dict) else {}, extracted)
             deep_set(self.current_profile_data, f"components.{name}", cfg)
+
+        # Misc tab returns {kill_sound: …, bomb_timer: …}
+        misc_cfgs = self.misc_tab.extract_config()
+        for section_name, section_cfg in misc_cfgs.items():
+            existing = deep_get(self.current_profile_data, f"components.{section_name}", {})
+            merged = _deep_merge_preserving_hidden(existing if isinstance(existing, dict) else {}, section_cfg)
+            deep_set(self.current_profile_data, f"components.{section_name}", merged)
 
     def _on_component_config_changed(self, component_name: str, config: dict[str, Any]) -> None:
         if self._loading_profile:
@@ -489,6 +532,10 @@ class MainWindow(QtWidgets.QMainWindow):
             self.pixel_trigger_tab.load_config(deep_get(self.current_profile_data, "components.pixel_trigger", {}))
         elif name == "cv_trigger":
             self.cv_trigger_tab.load_config(deep_get(self.current_profile_data, "components.cv_trigger", {}))
+        elif name == "bomb_timer":
+            self.misc_tab.load_config("bomb_timer", deep_get(self.current_profile_data, "components.bomb_timer", {}))
+        elif name == "kill_sound":
+            self.misc_tab.load_config("kill_sound", deep_get(self.current_profile_data, "components.kill_sound", {}))
         self.runtime.restart_component(name, self.current_profile_data)
         if save:
             self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)
