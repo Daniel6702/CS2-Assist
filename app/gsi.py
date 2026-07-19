@@ -36,6 +36,7 @@ class GameState:
     kills: int | None
     team: str | None
     defusekit: bool | None
+    is_scoped: bool | None
 
     @classmethod
     def from_payload(cls, payload: dict) -> "GameState":
@@ -102,6 +103,21 @@ class GameState:
         else:
             defusekit_bool = None
 
+        # CS2 sends player.state.scoped (bool).  Fall back to player.state.zoomed
+        # which some CS2 GSI configurations send instead.
+        scoped_raw = player_state.get("scoped")
+        if scoped_raw is None:
+            scoped_raw = player_state.get("zoomed")
+
+        if isinstance(scoped_raw, bool):
+            is_scoped = scoped_raw
+        elif scoped_raw in (0, 1):
+            is_scoped = bool(scoped_raw)
+        elif isinstance(scoped_raw, str):
+            is_scoped = scoped_raw.strip().lower() in ("true", "1", "yes")
+        else:
+            is_scoped = None
+
         player_stats = player.get("match_stats", {}) or {}
         kills = _parse_int(player_stats.get("kills"))
 
@@ -117,6 +133,7 @@ class GameState:
             kills=kills,
             team=team,
             defusekit=defusekit_bool,
+            is_scoped=is_scoped,
         )
 
 

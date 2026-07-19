@@ -19,7 +19,6 @@ _OFFSET_FROM_CENTER_X = -10
 _OFFSET_FROM_CENTER_Y = 24
 _CAPTURE_SIZE = 14
 _POLL_INTERVAL = 0.1
-_BOMB_SECONDS = 40
 _CONFIRM_FRAMES = 2
 _SCAN_GRACE_SECONDS = 3  # wait after freezetime→live before scanning
 _DETECTION_DELAY = 0.6  # compensate for poll+confirm delay after plant
@@ -48,6 +47,7 @@ class BombTimerComponent(BaseComponent):
         # Config
         self._game_w = _REF_W
         self._game_h = _REF_H
+        self._bomb_seconds = 40
         self._ten_sec_enabled = True
         self._ten_sec_file = ""
         self._ten_sec_vol = 50
@@ -75,6 +75,7 @@ class BombTimerComponent(BaseComponent):
             gr = config.get("game_resolution", {}) or {}
             self._game_w = max(1, int(gr.get("width", _REF_W)))
             self._game_h = max(1, int(gr.get("height", _REF_H)))
+            self._bomb_seconds = max(10, int(config.get("timer_seconds", 40)))
             self._ten_sec_enabled = bool(config.get("warning_10s_enabled", True))
             self._ten_sec_file = str(config.get("warning_10s_file", "") or "")
             self._ten_sec_vol = int(config.get("warning_10s_volume", 50))
@@ -180,16 +181,16 @@ class BombTimerComponent(BaseComponent):
                         with self._lock:
                             self._bomb_planted = True
                             self._plant_time = time.monotonic() - _DETECTION_DELAY
-                            self._remaining = _BOMB_SECONDS
+                            self._remaining = self._bomb_seconds
                             self._played_10s = False
                             self._played_5s = False
-                        self.status("Bomb planted! 40s timer started.")
+                        self.status(f"Bomb planted! {self._bomb_seconds}s timer started.")
 
                 else:
                     # ---- countdown ----------------------------------------
                     now = time.monotonic()
                     elapsed = now - plant_time
-                    rem = int(max(0, _BOMB_SECONDS - elapsed))
+                    rem = int(max(0, self._bomb_seconds - elapsed))
                     with self._lock:
                         self._remaining = rem
 

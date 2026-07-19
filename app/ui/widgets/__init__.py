@@ -9,6 +9,9 @@ __all__ = [
     "CVRuleEditor",
     "CVTriggerEditor",
     "AimCurveEditor",
+    "CS2CrosshairCodec",
+    "CrosshairRenderer",
+    "PixelGridWidget",
 ]
 
 
@@ -41,4 +44,16 @@ def __getattr__(name: str):
         from .curve_editor import AimCurveEditor
 
         return AimCurveEditor
+    if name == "CS2CrosshairCodec":
+        from .crosshair_codec import CS2CrosshairCodec
+
+        return CS2CrosshairCodec
+    if name == "CrosshairRenderer":
+        from .crosshair_renderer import CrosshairRenderer
+
+        return CrosshairRenderer
+    if name == "PixelGridWidget":
+        from .crosshair_grid_widget import PixelGridWidget
+
+        return PixelGridWidget
     raise AttributeError(f"module 'app.ui.widgets' has no attribute '{name}'")

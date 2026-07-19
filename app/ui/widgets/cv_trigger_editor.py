@@ -75,16 +75,26 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         outer.setContentsMargins(8, 8, 8, 8)
         outer.setSpacing(6)
 
-        top_row = QtWidgets.QHBoxLayout()
-        top_row.setSpacing(12)
-        outer.addLayout(top_row)
+        columns_layout = QtWidgets.QHBoxLayout()
+        columns_layout.setSpacing(12)
+        outer.addLayout(columns_layout)
+
+        # ── Left column ────────────────────────────────────────────────
+        left_column = QtWidgets.QVBoxLayout()
+        left_column.setSpacing(12)
+        columns_layout.addLayout(left_column, 1)
+
+        # Row 1: Status | Target Side
+        row1 = QtWidgets.QHBoxLayout()
+        row1.setSpacing(12)
+        left_column.addLayout(row1)
 
         status_group = QtWidgets.QGroupBox("Status")
         status_layout = QtWidgets.QFormLayout(status_group)
         status_layout.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         status_layout.setHorizontalSpacing(12)
         status_layout.setVerticalSpacing(6)
-        top_row.addWidget(status_group, 1)
+        row1.addWidget(status_group, 1)
 
         self.enabled = QtWidgets.QCheckBox()
         self.enabled.stateChanged.connect(self._emit_change)
@@ -99,7 +109,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         target_layout.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         target_layout.setHorizontalSpacing(12)
         target_layout.setVerticalSpacing(6)
-        top_row.addWidget(target_group, 1)
+        row1.addWidget(target_group, 1)
 
         self.use_gsi_opponent_side = QtWidgets.QCheckBox()
         self.use_gsi_opponent_side.stateChanged.connect(self._update_target_side_visibility)
@@ -114,12 +124,13 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         target_layout.addRow("Manual target side", self.manual_target_side)
         self.manual_target_side_label = target_layout.labelForField(self.manual_target_side)
 
+        # Row 2: Model Settings
         model_group = QtWidgets.QGroupBox("Model Settings")
         model_form = QtWidgets.QFormLayout(model_group)
         model_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         model_form.setHorizontalSpacing(12)
         model_form.setVerticalSpacing(6)
-        top_row.addWidget(model_group, 1)
+        left_column.addWidget(model_group)
 
         self.model_path = QtWidgets.QLineEdit()
         self.model_path.editingFinished.connect(self._emit_change)
@@ -138,16 +149,17 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         self.inference_img_size.valueChanged.connect(self._emit_change)
         model_form.addRow("Image Size", self.inference_img_size)
 
-        tuning_row = QtWidgets.QHBoxLayout()
-        tuning_row.setSpacing(12)
-        outer.addLayout(tuning_row)
+        # Row 3: Stability and Smoothing | Anti-Oscillation
+        row3 = QtWidgets.QHBoxLayout()
+        row3.setSpacing(12)
+        left_column.addLayout(row3)
 
-        detection_group = QtWidgets.QGroupBox("Stability &&38; Smoothing")
+        detection_group = QtWidgets.QGroupBox("Stability and Smoothing")
         detection_form = QtWidgets.QFormLayout(detection_group)
         detection_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         detection_form.setHorizontalSpacing(12)
         detection_form.setVerticalSpacing(6)
-        tuning_row.addWidget(detection_group, 1)
+        row3.addWidget(detection_group, 1)
 
         self.jitter_deadzone_px = QtWidgets.QDoubleSpinBox()
         self.jitter_deadzone_px.setRange(0.0, 100.0)
@@ -189,7 +201,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         anti_oscillation_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         anti_oscillation_form.setHorizontalSpacing(12)
         anti_oscillation_form.setVerticalSpacing(6)
-        tuning_row.addWidget(anti_oscillation_group, 1)
+        row3.addWidget(anti_oscillation_group, 1)
 
         self.anti_oscillation_radius_px = QtWidgets.QDoubleSpinBox()
         self.anti_oscillation_radius_px.setRange(0.0, 250.0)
@@ -210,6 +222,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         self.anti_oscillation_lock_frames.valueChanged.connect(self._emit_change)
         anti_oscillation_form.addRow("Reversal lock frames", self.anti_oscillation_lock_frames)
 
+        # ── Right column: Aim Motion Curves ────────────────────────────
         aim_curve_group = QtWidgets.QGroupBox("Aim Motion Curves")
         aim_curve_layout = QtWidgets.QVBoxLayout(aim_curve_group)
         aim_curve_layout.setContentsMargins(8, 8, 8, 8)
@@ -217,7 +230,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         self.aim_curve_editor.changed.connect(self._sync_rule_curve_options)
         self.aim_curve_editor.changed.connect(self._emit_change)
         aim_curve_layout.addWidget(self.aim_curve_editor)
-        outer.addWidget(aim_curve_group)
+        columns_layout.addWidget(aim_curve_group, 1)
 
         rule_header = QtWidgets.QHBoxLayout()
         label_col = QtWidgets.QVBoxLayout()

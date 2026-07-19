@@ -57,6 +57,22 @@ class SharedSettingsTab(BaseTab):
         resolution_layout.addStretch(1)
         shared_layout.addRow("Game Resolution", resolution_row)
 
+        self.shared_display_width = QtWidgets.QSpinBox()
+        self.shared_display_width.setRange(1, 100000)
+        self.shared_display_width.setSingleStep(10)
+        self.shared_display_height = QtWidgets.QSpinBox()
+        self.shared_display_height.setRange(1, 100000)
+        self.shared_display_height.setSingleStep(10)
+        display_resolution_row = QtWidgets.QWidget()
+        display_resolution_layout = QtWidgets.QHBoxLayout(display_resolution_row)
+        display_resolution_layout.setContentsMargins(0, 0, 0, 0)
+        display_resolution_layout.addWidget(QtWidgets.QLabel("Width"))
+        display_resolution_layout.addWidget(self.shared_display_width)
+        display_resolution_layout.addWidget(QtWidgets.QLabel("Height"))
+        display_resolution_layout.addWidget(self.shared_display_height)
+        display_resolution_layout.addStretch(1)
+        shared_layout.addRow("Display Resolution", display_resolution_row)
+
         layout.addWidget(shared_group)
 
         # Game State Integration section
@@ -237,6 +253,12 @@ class SharedSettingsTab(BaseTab):
         self.shared_game_width.setValue(max(1, int(game_resolution.get("width", 1600) or 1600)))
         self.shared_game_height.setValue(max(1, int(game_resolution.get("height", 1200) or 1200)))
 
+        display_resolution = shared.get("display_resolution", {"width": 1920, "height": 1080})
+        if not isinstance(display_resolution, dict):
+            display_resolution = {"width": 1920, "height": 1080}
+        self.shared_display_width.setValue(max(1, int(display_resolution.get("width", 1920) or 1920)))
+        self.shared_display_height.setValue(max(1, int(display_resolution.get("height", 1080) or 1080)))
+
         # GSI settings
         gsi = config.get("gsi", {})
         self.gsi_enabled.setChecked(bool(gsi.get("enabled", True)))
@@ -280,6 +302,10 @@ class SharedSettingsTab(BaseTab):
                 "game_resolution": {
                     "width": self.shared_game_width.value(),
                     "height": self.shared_game_height.value(),
+                },
+                "display_resolution": {
+                    "width": self.shared_display_width.value(),
+                    "height": self.shared_display_height.value(),
                 },
             },
             "gsi": {

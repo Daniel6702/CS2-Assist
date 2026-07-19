@@ -5,6 +5,7 @@ from typing import Any, Final
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from app.common import deep_copy, deep_get, deep_set
+from app.components.pixel_trigger import PixelTriggerComponent
 from app.components.recoil import RecoilComponent
 from app.device_service import DeviceService
 from app.profile_store import ProfileStore
@@ -63,6 +64,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.overlay_timer = QtCore.QTimer(self)
         self.overlay_timer.timeout.connect(self._tick_bullet_overlay)
         self.overlay_timer.timeout.connect(self._tick_bomb_timer)
+        self.overlay_timer.timeout.connect(self._tick_pixel_trigger_scope_status)
 
         self.current_profile_name = "Default"
         self.current_profile_data = self.profile_store.load_profile(self.current_profile_name)
@@ -140,10 +142,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.tabs.addTab(self.shared_settings_tab, "Shared Settings")
         self.tabs.addTab(self.cv_trigger_tab, "CV Aim Assist")
-        self.tabs.addTab(self.misc_tab, "Misc")
         self.tabs.addTab(self.recoil_tab, "Recoil")
         self.tabs.addTab(self.pixel_trigger_tab, "Pixel Trigger")
         self.tabs.addTab(self.movement_tab, "Movement")
+        self.tabs.addTab(self.misc_tab, "Misc")
         self.tabs.addTab(self.log_tab, "Log")
 
         # Connect signals
@@ -179,7 +181,7 @@ class MainWindow(QtWidgets.QMainWindow):
         for section in self.movement_tab.sections.values():
             section.editor.config_changed.connect(self._on_component_config_changed)
         self.recoil_tab.config_changed.connect(self._on_component_config_changed)
-        self.pixel_trigger_tab.editor.config_changed.connect(self._on_component_config_changed)
+        self.pixel_trigger_tab.config_changed.connect(self._on_component_config_changed)
         self.cv_trigger_tab.editor.config_changed.connect(self._on_component_config_changed)
         self.misc_tab.config_changed.connect(self._on_component_config_changed)
 
@@ -309,7 +311,15 @@ class MainWindow(QtWidgets.QMainWindow):
         elif source == "cv_trigger":
             self.cv_trigger_tab.set_runtime_status(message.replace("[INFO] ", "").replace("[WARNING] ", "").replace("[ERROR] ", ""))
         elif source == "gsi" and "weapon=" in message:
-            self.shared_settings_tab.set_last_state(message.replace("[INFO] ", ""))
+            clean = message.replace("[INFO] ", "")
+            self.shared_settings_tab.set_last_state(clean)
+
+    def _tick_pixel_trigger_scope_status(self) -> None:
+        if self._closing:
+            return
+        component = self.runtime.components.get("pixel_trigger")
+        if isinstance(component, PixelTriggerComponent):
+            self.pixel_trigger_tab.set_scoped_status(component.scope_state())
 
     def _refresh_profile_list(self) -> None:
         names = self.profile_store.list_profile_names()
@@ -341,7 +351,19 @@ class MainWindow(QtWidgets.QMainWindow):
             self.shared_settings_tab.load_config(app_config)
             self.movement_tab.load_config(deep_get(self.current_profile_data, "components", {}))
             self.recoil_tab.load_config(deep_get(self.current_profile_data, "components.recoil", {}))
-            self.pixel_trigger_tab.load_config(deep_get(self.current_profile_data, "components.pixel_trigger", {}))
+
+            # Pre-populate pixel trigger config with shared resolution data
+            pixel_trigger_cfg = deep_copy(deep_get(self.current_profile_data, "components.pixel_trigger", {}) or {})
+            shared_cfg = deep_get(self.current_profile_data, "app.shared", {}) or {}
+            if isinstance(shared_cfg, dict):
+                if "game_resolution" not in pixel_trigger_cfg or not pixel_trigger_cfg.get("game_resolution"):
+                    gr = shared_cfg.get("game_resolution", {"width": 1920, "height": 1080})
+                    pixel_trigger_cfg["game_resolution"] = deep_copy(gr) if isinstance(gr, dict) else {"width": 1920, "height": 1080}
+                if "display_resolution" not in pixel_trigger_cfg or not pixel_trigger_cfg.get("display_resolution"):
+                    dr = shared_cfg.get("display_resolution", {"width": 1920, "height": 1080})
+                    pixel_trigger_cfg["display_resolution"] = deep_copy(dr) if isinstance(dr, dict) else {"width": 1920, "height": 1080}
+            self.pixel_trigger_tab.load_config(pixel_trigger_cfg)
+
             self.cv_trigger_tab.load_config(deep_get(self.current_profile_data, "components.cv_trigger", {}))
             self.misc_tab.load_config("kill_sound", deep_get(self.current_profile_data, "components.kill_sound", {}))
             self.misc_tab.load_config("bomb_timer", deep_get(self.current_profile_data, "components.bomb_timer", {}))
@@ -529,7 +551,16 @@ class MainWindow(QtWidgets.QMainWindow):
         elif name == "recoil":
             self.recoil_tab.load_config(deep_get(self.current_profile_data, "components.recoil", {}))
         elif name == "pixel_trigger":
-            self.pixel_trigger_tab.load_config(deep_get(self.current_profile_data, "components.pixel_trigger", {}))
+            pt_cfg = deep_copy(deep_get(self.current_profile_data, "components.pixel_trigger", {}) or {})
+            shared_cfg = deep_get(self.current_profile_data, "app.shared", {}) or {}
+            if isinstance(shared_cfg, dict):
+                if not pt_cfg.get("game_resolution"):
+                    gr = shared_cfg.get("game_resolution", {"width": 1920, "height": 1080})
+                    pt_cfg["game_resolution"] = deep_copy(gr) if isinstance(gr, dict) else {"width": 1920, "height": 1080}
+                if not pt_cfg.get("display_resolution"):
+                    dr = shared_cfg.get("display_resolution", {"width": 1920, "height": 1080})
+                    pt_cfg["display_resolution"] = deep_copy(dr) if isinstance(dr, dict) else {"width": 1920, "height": 1080}
+            self.pixel_trigger_tab.load_config(pt_cfg)
         elif name == "cv_trigger":
             self.cv_trigger_tab.load_config(deep_get(self.current_profile_data, "components.cv_trigger", {}))
         elif name == "bomb_timer":

@@ -62,7 +62,7 @@ class ComponentEditor(QtWidgets.QGroupBox):
         form = QtWidgets.QFormLayout()
         form.setLabelAlignment(QtCore.Qt.AlignTop)
         form.setHorizontalSpacing(12)
-        form.setVerticalSpacing(6)
+        form.setVerticalSpacing(12)
         outer.addLayout(form)
 
         advanced_form: QtWidgets.QFormLayout | None = None
@@ -87,7 +87,7 @@ class ComponentEditor(QtWidgets.QGroupBox):
                     advanced_form = QtWidgets.QFormLayout(container)
                     advanced_form.setLabelAlignment(QtCore.Qt.AlignTop)
                     advanced_form.setHorizontalSpacing(12)
-                    advanced_form.setVerticalSpacing(6)
+                    advanced_form.setVerticalSpacing(12)
 
                     form.addRow(advanced_btn, container)
 

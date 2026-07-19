@@ -69,12 +69,7 @@ class MiscTab(BaseTab):
         test_btn.clicked.connect(self._test_kill_sound)
         form.addRow("", test_btn)
 
-        help_lbl = QtWidgets.QLabel(
-            "Requires GSI to be enabled.  Plays when a kill is recorded via GSI."
-        )
-        help_lbl.setWordWrap(True)
-        help_lbl.setStyleSheet("color: #666;")
-        parent.addWidget(help_lbl)
+
 
     def _browse_kill_sound(self) -> None:
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
@@ -116,44 +111,67 @@ class MiscTab(BaseTab):
         outer.setSpacing(6)
         parent.addWidget(group)
 
-        # Enabled
+        columns = QtWidgets.QHBoxLayout()
+        columns.setSpacing(24)
+        outer.addLayout(columns)
+
+        left = QtWidgets.QVBoxLayout()
+        left.setSpacing(4)
+        columns.addLayout(left)
+
         self.bt_enabled = QtWidgets.QCheckBox("Enabled")
         self.bt_enabled.stateChanged.connect(self._emit_bomb_timer)
-        outer.addWidget(self.bt_enabled)
+        left.addWidget(self.bt_enabled)
+        left.addSpacing(6)
 
-        # Overlay font size
-        size_row = QtWidgets.QHBoxLayout()
+        size_color_row = QtWidgets.QHBoxLayout()
+        size_color_row.setSpacing(16)
+
         self.bt_font_size = QtWidgets.QSpinBox()
         self.bt_font_size.setRange(12, 200)
         self.bt_font_size.setValue(48)
         self.bt_font_size.valueChanged.connect(self._emit_bomb_timer)
-        size_row.addWidget(QtWidgets.QLabel("Font size:"))
-        size_row.addWidget(self.bt_font_size)
-        size_row.addStretch(1)
-        outer.addLayout(size_row)
+        size_color_row.addWidget(QtWidgets.QLabel("Font size:"))
+        size_color_row.addWidget(self.bt_font_size)
 
-        # Overlay colour
-        color_row = QtWidgets.QHBoxLayout()
         self.bt_color_btn = QtWidgets.QPushButton()
         self.bt_color_btn.setFixedSize(32, 24)
         self.bt_color_btn.clicked.connect(self._pick_bomb_color)
         self._bt_color = QtGui.QColor(255, 50, 50)
         self._update_color_button()
-        color_row.addWidget(QtWidgets.QLabel("Text colour:"))
-        color_row.addWidget(self.bt_color_btn)
-        color_row.addStretch(1)
-        outer.addLayout(color_row)
+        size_color_row.addWidget(QtWidgets.QLabel("Text colour:"))
+        size_color_row.addWidget(self.bt_color_btn)
 
-        # Defuse warning
-        self.bt_defuse_warn = QtWidgets.QCheckBox("CT defuse out-of-time warning")
+        size_color_row.addStretch(1)
+        left.addLayout(size_color_row)
+        left.addSpacing(6)
+
+        timer_row = QtWidgets.QHBoxLayout()
+        self.bt_timer_seconds = QtWidgets.QSpinBox()
+        self.bt_timer_seconds.setRange(20, 60)
+        self.bt_timer_seconds.setValue(40)
+        self.bt_timer_seconds.setSuffix(" sec")
+        self.bt_timer_seconds.valueChanged.connect(self._emit_bomb_timer)
+        timer_row.addWidget(QtWidgets.QLabel("Timer length:"))
+        timer_row.addWidget(self.bt_timer_seconds)
+        timer_row.addStretch(1)
+        left.addLayout(timer_row)
+        left.addStretch(1)
+
+
+        right = QtWidgets.QVBoxLayout()
+        right.setSpacing(6)
+        columns.addLayout(right)
+
+        self.bt_defuse_warn = QtWidgets.QCheckBox("CT defuse out-of-time warning overlay")
         self.bt_defuse_warn.setChecked(True)
         self.bt_defuse_warn.stateChanged.connect(self._emit_bomb_timer)
-        outer.addWidget(self.bt_defuse_warn)
+        right.addWidget(self.bt_defuse_warn)
+        right.addSpacing(4)
 
-        # Warning sounds
-        outer.addWidget(QtWidgets.QLabel("Warning sounds:"))
+        right.addWidget(QtWidgets.QLabel("Warning sounds:"))
         self._build_warning_sound(
-            outer,
+            right,
             label="10 seconds remaining",
             enabled_attr="bt_warn10_enabled",
             file_attr="bt_warn10_file",
@@ -162,7 +180,7 @@ class MiscTab(BaseTab):
             browse_callback=self._browse_10s,
         )
         self._build_warning_sound(
-            outer,
+            right,
             label="5 seconds remaining",
             enabled_attr="bt_warn5_enabled",
             file_attr="bt_warn5_file",
@@ -246,6 +264,7 @@ class MiscTab(BaseTab):
             "defuse_warning_enabled": self.bt_defuse_warn.isChecked(),
             "overlay_font_size": self.bt_font_size.value(),
             "overlay_color": self._bt_color.name(),
+            "timer_seconds": self.bt_timer_seconds.value(),
             "warning_10s_enabled": self.bt_warn10_enabled.isChecked(),
             "warning_10s_file": self.bt_warn10_file.text().strip(),
             "warning_10s_volume": self.bt_warn10_volume.value(),
@@ -269,6 +288,7 @@ class MiscTab(BaseTab):
             self.bt_enabled.setChecked(bool(config.get("enabled", False)))
             self.bt_defuse_warn.setChecked(bool(config.get("defuse_warning_enabled", True)))
             self.bt_font_size.setValue(int(config.get("overlay_font_size", 48)))
+            self.bt_timer_seconds.setValue(int(config.get("timer_seconds", 40)))
             raw_color = config.get("overlay_color", "#FF3232")
             if isinstance(raw_color, str):
                 self._bt_color = QtGui.QColor(raw_color)

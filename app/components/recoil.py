@@ -51,8 +51,6 @@ class RuntimeSettings:
     program_sens: float
     apply_x: bool
     apply_y: bool
-    frequency_hz: int
-    max_delta_per_event: int
     noise_strength_px: float
     return_mouse_enabled: bool
     return_mouse_delay_ms: int
@@ -150,8 +148,6 @@ def parse_settings(raw: dict[str, Any]) -> RuntimeSettings:
         program_sens=float(sens.get("program_sens", 2.52)),
         apply_x=bool(sens_ax.get("x", True)),
         apply_y=bool(sens_ax.get("y", True)),
-        frequency_hz=max(30, int(movement.get("frequency_hz", 165))),
-        max_delta_per_event=max(0, int(movement.get("max_delta_per_event", 3))),
         noise_strength_px=max(0.0, float(noise.get("strength_px", 0.0))),
         return_mouse_enabled=bool(ret.get("enabled", False)),
         return_mouse_delay_ms=max(0, int(ret.get("delay_ms", 20))),
@@ -419,10 +415,10 @@ class SmoothMousePlayer:
         if track_alignment:
             self.owner.add_alignment_delta(dx, dy)
 
-    def _send_bounded(self, dx: int, dy: int, max_delta_per_event: int, track_alignment: bool = True) -> None:
+    def _send_bounded(self, dx: int, dy: int, track_alignment: bool = True) -> None:
         if dx == 0 and dy == 0:
             return
-        limit = max_delta_per_event
+        limit = 3
         if limit <= 0:
             self._emit_relative(dx, dy, track_alignment)
             return
@@ -439,7 +435,7 @@ class SmoothMousePlayer:
         vels = calc_velocities(pts)
         times = [p.t for p in pts]
         total = pts[-1].t
-        step = 1.0 / max(1, st.frequency_hz)
+        step = 1.0 / 165.0
 
         _sf = self.owner._safety_config
         _enabled = bool(_sf.get("enabled", False))
@@ -474,7 +470,7 @@ class SmoothMousePlayer:
             movy = int(round(movy_f))
             resx = movx_f - movx
             resy = movy_f - movy
-            self._send_bounded(movx, movy, st.max_delta_per_event, track_alignment=True)
+            self._send_bounded(movx, movy, track_alignment=True)
             lastx, lasty = tx, ty
 
             if logical_t >= total:
@@ -499,7 +495,7 @@ class SmoothMousePlayer:
             total_dx = -float(spray_offset_x)
             total_dy = -float(spray_offset_y) * (st.return_mouse_y_percent / 100.0)
             duration_s = max(0.02, st.return_mouse_duration_ms / 1000.0)
-            tick = 1.0 / max(90, st.frequency_hz)
+            tick = 1.0 / 165.0
             start = time.perf_counter()
             sent_x = sent_y = 0
 
@@ -514,7 +510,7 @@ class SmoothMousePlayer:
                 move_x = want_x - sent_x
                 move_y = want_y - sent_y
                 if move_x or move_y:
-                    self._send_bounded(move_x, move_y, st.max_delta_per_event, track_alignment=False)
+                    self._send_bounded(move_x, move_y, track_alignment=False)
                     sent_x = want_x
                     sent_y = want_y
                 if u >= 1.0:

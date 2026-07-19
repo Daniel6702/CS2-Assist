@@ -84,10 +84,7 @@ def default_profile() -> dict[str, Any]:
                     "program_sens": 2.52,
                     "apply_to_axis": {"x": True, "y": True},
                 },
-                "movement": {
-                    "frequency_hz": 165,
-                    "max_delta_per_event": 3,
-                },
+                "movement": {},
                 "noise": {
                     "strength_px": 0.0,
                 },
@@ -114,6 +111,9 @@ def default_profile() -> dict[str, Any]:
                 "monitor_index": 1,
                 "x": None,
                 "y": None,
+                "scope_blur_offset_x": 0,
+                "scope_blur_offset_y": 0,
+                "scope_blur_duration_ms": 0,
             },
             "kill_sound": {
                 "enabled": False,
@@ -125,6 +125,7 @@ def default_profile() -> dict[str, Any]:
                 "defuse_warning_enabled": True,
                 "overlay_font_size": 48,
                 "overlay_color": "#FF3232",
+                "timer_seconds": 40,
                 "warning_10s_enabled": True,
                 "warning_10s_file": "",
                 "warning_10s_volume": 50,

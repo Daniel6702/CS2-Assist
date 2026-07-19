@@ -59,8 +59,6 @@ class RecoilTab(BaseTab):
                 {"path": "enabled", "label": "Enabled", "kind": "bool"},
                 {"path": "axis_strength_percent.x", "label": "X strength %", "kind": "float", "min": 0.0, "max": 300.0, "step": 1.0},
                 {"path": "axis_strength_percent.y", "label": "Y strength %", "kind": "float", "min": 0.0, "max": 300.0, "step": 1.0},
-                {"path": "movement.frequency_hz", "label": "Update frequency (Hz)", "kind": "int", "min": 30, "max": 1000},
-                {"path": "movement.max_delta_per_event", "label": "Max delta per event (px)", "kind": "int", "min": 0, "max": 50},
                 {"path": "noise.strength_px", "label": "Noise amount (px)", "kind": "float", "min": 0.0, "max": 5.0, "step": 0.01, "decimals": 3},
             ],
             device_service=device_service,
@@ -99,6 +97,9 @@ class RecoilTab(BaseTab):
         ]:
             editor.setTitle("")
             layout.addWidget(editor)
+
+        self.return_editor.runtime_status.setVisible(False)
+        self.overlay_editor.runtime_status.setVisible(False)
 
         # First row: Base Controls and Mouse Return side by side
         top_row = QtWidgets.QHBoxLayout()

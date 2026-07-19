@@ -119,8 +119,14 @@ class RuntimeManager:
         cfg = self._effective_component_config(profile, name)
         component.configure(cfg)
         component.set_runtime_gate(self._gsi_gate_open, self._gsi_gate_reason)
-        if cfg.get("enabled", False):
-            component.stop()
+
+        now_enabled = bool(cfg.get("enabled", False))
+        if component.enabled and now_enabled:
+            # Already running and should stay running — just push config.
+            # The thread picks it up from self._config on its next iteration
+            # (or on a manual stop/start for snapshot-based components).
+            return
+        if now_enabled:
             component.start()
         else:
             component.stop()
@@ -182,7 +188,7 @@ class RuntimeManager:
 
         self.status_callback(
             "gsi",
-            f"[INFO] weapon={state.current_weapon} ammo={state.ammo_clip}/{state.ammo_clip_max} alive={state.player_alive} phase={state.round_phase} allowed={state.features_allowed}",
+            f"[INFO] weapon={state.current_weapon} ammo={state.ammo_clip}/{state.ammo_clip_max} alive={state.player_alive} phase={state.round_phase} allowed={state.features_allowed} scoped={state.is_scoped}",
         )
         for component in self.components.values():
             try:
