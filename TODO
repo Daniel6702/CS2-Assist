@@ -5,3 +5,9 @@
     Direction change can therefore also not be infered from frame to frame direction shift, must be over several frames.
     But the biggest problem is that, we only know the targets screen space position, not their true position. Which means if the screen / view moves, then this is equal to the actual targets moves. I.e. if the aim assist attempts to move to the target, but the target is extrapolated dependent on this movement itself, this causes inevitable closed loop instability. Causing jittering and oscillations. Fundamental limit of control theory, loop gain > 1, when extrapolating, -> oscilations. There is not world space / ground truth reference, not even mentioning the delay and unstable input.
     Only potential solution: subtracting camera movement, but probably not worth looking in to.
+
+- Debugging tab with log, aim target overlay, bounding box overlay
+
+- Anti Flash filter
+
+- Defuse timer. I.e. when Ct start defusing T can tell for how long.

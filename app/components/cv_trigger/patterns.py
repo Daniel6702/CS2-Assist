@@ -114,8 +114,8 @@ _resolve_pattern_name = resolve_pattern_name
 
 
 _CLASS_INDEX_BY_SIDE_AND_TYPE = {
-    "t": {"type1": 0, "type2": 1},
-    "ct": {"type1": 2, "type2": 3},
+    "t": {"type1": 2, "type2": 3},
+    "ct": {"type1": 0, "type2": 1},
 }
 
 
