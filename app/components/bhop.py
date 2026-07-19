@@ -20,7 +20,7 @@ class BhopSpam(threading.Thread):
 
     def run(self) -> None:
         while self.running:
-            if self.enabled and self.owner.automation_permitted():
+            if self.enabled and self.owner.automation_permitted() and not self.owner._ctrl_blocked():
                 linux_input.emit(self.ui, self.key_space, 1, syn=False)
                 linux_input.emit(self.ui, self.key_space, 0)
                 time.sleep(self.tap_interval)
@@ -43,6 +43,19 @@ class BhopComponent(BaseComponent):
         self._stop = threading.Event()
         self._spammer: BhopSpam | None = None
         self._state_lock = threading.RLock()
+        self._ctrl_lock = threading.RLock()
+        self._ctrl_pressed = False
+        self._ctrl_unblock_time = 0.0
+
+    def _ctrl_blocked(self) -> bool:
+        """Return True while Ctrl is held and for 500 ms after release.
+        During this window the spammer suppresses all auto-jumps so the
+        player can perform tall-box jumps that need a held Ctrl + Space.
+        """
+        with self._ctrl_lock:
+            if self._ctrl_pressed:
+                return True
+            return time.perf_counter() < self._ctrl_unblock_time
 
     def on_runtime_gate_changed(self, open_: bool, reason: str) -> None:
         if open_:
@@ -70,7 +83,9 @@ class BhopComponent(BaseComponent):
             self.status("Linux evdev/uinput backend is not available.", "error")
             return
 
-        key_space = linux_input.ecodes.KEY_SPACE
+        c = linux_input.ecodes
+        key_space = c.KEY_SPACE
+        ctrl_keys = {c.KEY_LEFTCTRL, c.KEY_RIGHTCTRL}
         config = dict(self._config)
         device_path = str(config.get("device_path", ""))
         tap_interval_ms = int(config.get("tap_interval_ms", 20))
@@ -92,23 +107,37 @@ class BhopComponent(BaseComponent):
         def on_event(event, _ui) -> bool:
             if event.type != linux_input.ecodes.EV_KEY:
                 return False
-            if event.code != key_space:
+            code = event.code
+            value = event.value
+
+            # Track Ctrl state — never consume the event so the game
+            # still receives it normally.
+            if code in ctrl_keys and value != 2:
+                with self._ctrl_lock:
+                    self._ctrl_pressed = value == 1
+                    if self._ctrl_pressed:
+                        self._ctrl_unblock_time = float("inf")
+                    else:
+                        self._ctrl_unblock_time = time.perf_counter() + 0.5
+                return False
+
+            if code != key_space:
                 return False
             with self._state_lock:
                 spammer = self._spammer
             if spammer is None:
                 return False
             if not self.automation_permitted():
-                if event.value != 2:
+                if value != 2:
                     spammer.enabled = False
                 return False
-            if event.value != 2:
-                spammer.enabled = event.value == 1
+            if value != 2:
+                spammer.enabled = value == 1
             return True
 
         runner = linux_input.LinuxKeyboardRunner(
             device_path=device_path,
-            required_keys={key_space},
+            required_keys={key_space} | ctrl_keys,
             component_name=self.name,
             exclusive_keys={key_space},
             event_callback=on_event,

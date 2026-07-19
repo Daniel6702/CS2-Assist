@@ -21,6 +21,7 @@ class Config:
     curve: str = "linear"
     manual_brake_window_ms: int = 150
     manual_brake_max_ms: int = 170
+    min_hold_ms: int = 120
 
 
 class CounterStrafe:
@@ -42,6 +43,11 @@ class CounterStrafe:
 
         self.shift_held = False
         self.ctrl_held = False
+
+        # Per-axis flag: suppress the next counter-tap on key release.
+        # Set on jump-landing so releasing a direction key that was held
+        # through the jump does not fire an unwanted counter-strafe.
+        self._suppress_next_release: dict[str, bool] = {"x": False, "y": False}
 
         self.axis_of = {
             self.c["KEY_W"]: "y",
@@ -178,6 +184,7 @@ class CounterStrafe:
             was_active = self.active[axis] == key
 
             if value == 1:
+                self._suppress_next_release[axis] = False
                 self.cancel_counter_tap(axis)
                 self.mark_manual_brake(axis, key, now)
                 if key in stack:
@@ -210,6 +217,19 @@ class CounterStrafe:
 
             if was_active:
                 self.clear_manual_brake(axis)
+                if self._suppress_next_release[axis]:
+                    self._suppress_next_release[axis] = False
+                    self.apply_axis(axis)
+                    return
+                # Skip counter-tap when the key was held too briefly
+                # to build meaningful lateral velocity (e.g. a quick
+                # course correction tap while running forward).
+                since = self.active_since[axis]
+                if since is not None:
+                    hold_ms = (now - since) * 1000.0
+                    if hold_ms < self.cfg.min_hold_ms:
+                        self.apply_axis(axis)
+                        return
                 self.start_counter_tap(axis, self.opposite_of[key], self.counter_duration(axis))
                 return
 
@@ -217,18 +237,75 @@ class CounterStrafe:
             self.clear_manual_brake(axis)
             self.apply_axis(axis)
 
+    def suppress_post_jump(self) -> None:
+        """Suppress counter-tap on the next key release for both axes.
+
+        Called when landing from a jump.  A direction key held through
+        the jump should not trigger a counter-strafe when released.
+        """
+        with self.lock:
+            self._suppress_next_release["x"] = True
+            self._suppress_next_release["y"] = True
+
     def release_all(self) -> None:
         with self.lock:
             for axis in ("x", "y"):
                 self.cancel_counter_tap(axis)
                 self.stack[axis].clear()
                 self.clear_manual_brake(axis)
+                self._suppress_next_release[axis] = False
                 key = self.active[axis]
                 if key is not None:
                     linux_input.emit(self.ui, key, 0, syn=False)
                 self.active[axis] = None
                 self.active_since[axis] = None
+                self.last_released_key[axis] = None
+                self.last_release_time[axis] = None
             self.ui.syn()
+
+    def suspend(self) -> None:
+        """Suspend counter-strafing (e.g. during jump).
+
+        Cancels any running counter-tap timers and releases injected
+        keys, but preserves the physical-key tracking stack so state
+        stays coherent when normal operation resumes.
+        """
+        with self.lock:
+            for axis in ("x", "y"):
+                self.cancel_counter_tap(axis)
+                self.clear_manual_brake(axis)
+            for axis in ("x", "y"):
+                self.apply_axis(axis)
+
+    def track_key(self, key: int, value: int) -> None:
+        """Track a movement key during suspend mode without generating a
+        counter-tap.
+
+        Updates the tracking stack and emits the key through apply_axis so
+        the game sees normal input, but no counter-strafe logic runs.  To
+        be called only while *suspend* is active (e.g. jump held).
+        """
+        if value == 2:
+            return
+        with self.lock:
+            now = time.perf_counter()
+            axis = self.axis_of[key]
+            stack = self.stack[axis]
+
+            if value == 1:
+                if key in stack:
+                    stack.remove(key)
+                stack.append(key)
+                self.apply_axis(axis)
+                return
+
+            if value == 0:
+                if key in stack:
+                    stack.remove(key)
+                self.last_released_key[axis] = key
+                self.last_release_time[axis] = now
+                self.apply_axis(axis)
+                return
 
 
 class CounterStrafeComponent(BaseComponent):
@@ -292,6 +369,7 @@ class CounterStrafeComponent(BaseComponent):
             curve=str(self._config.get("curve", "linear")),
             manual_brake_window_ms=int(self._config.get("manual_brake_window_ms", 150)),
             manual_brake_max_ms=int(self._config.get("manual_brake_max_ms", 170)),
+            min_hold_ms=int(self._config.get("min_hold_ms", 120)),
         )
         movement_keys = {c.KEY_W, c.KEY_A, c.KEY_S, c.KEY_D}
         modifier_keys = {c.KEY_LEFTSHIFT, c.KEY_RIGHTSHIFT, c.KEY_LEFTCTRL, c.KEY_RIGHTCTRL}
@@ -325,16 +403,36 @@ class CounterStrafeComponent(BaseComponent):
                 return False
 
             if key == key_space and value != 2:
+                was_jumping = jump_held[0]
                 jump_held[0] = value == 1
-                if jump_held[0]:
-                    state.release_all()
+                if jump_held[0] and not was_jumping:
+                    # Jump pressed — suspend counter-strafing but preserve
+                    # the physical-key tracking stack so state stays
+                    # coherent when we resume on landing.
+                    state.suspend()
+                elif not jump_held[0] and was_jumping:
+                    # Landed — suppress counter-tap for direction keys
+                    # held through the jump so the landing feels natural.
+                    state.suppress_post_jump()
                 return False
 
-            if not self.automation_permitted() or jump_held[0]:
+            if not self.automation_permitted():
                 state.release_all()
                 if key in modifier_keys:
                     state.modifier_event(key, value)
                 return False
+
+            if jump_held[0]:
+                # While in the air: track keys normally (stack, emission)
+                # but never run counter-tap logic.  Modifiers still update
+                # so the first counter after landing uses the right factor.
+                if key in movement_keys:
+                    state.track_key(key, value)
+                    return True
+                if key in modifier_keys:
+                    state.modifier_event(key, value)
+                return False
+
             if key in movement_keys:
                 state.movement_event(key, value)
                 return True

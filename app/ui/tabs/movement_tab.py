@@ -62,8 +62,15 @@ class MovementTab(BaseTab):
             "counter_strafe": _ComponentSection("counter_strafe", "Counter Strafe", _schema_for("counter_strafe"), device_service),
         }
 
-        for section in self.sections.values():
-            layout.addWidget(section)
+        # Row 1: Bhop and Snap Tap side by side
+        row1 = QtWidgets.QHBoxLayout()
+        row1.setSpacing(12)
+        row1.addWidget(self.sections["bhop"], 1)
+        row1.addWidget(self.sections["snap_tap"], 1)
+        layout.addLayout(row1)
+
+        # Row 2: Counter Strafe
+        layout.addWidget(self.sections["counter_strafe"])
 
         layout.addStretch(1)
 

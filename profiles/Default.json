@@ -46,7 +46,7 @@
     },
     "components": {
         "bhop": {
-            "enabled": false,
+            "enabled": true,
             "tap_interval_ms": 20
         },
         "snap_tap": {

@@ -46,6 +46,8 @@ class ComponentEditor(QtWidgets.QGroupBox):
         self.schema = schema
         self.device_service = device_service
         self.widgets: dict[str, QtWidgets.QWidget] = {}
+        self._advanced_container: QtWidgets.QWidget | None = None
+        self._advanced_btn: QtWidgets.QPushButton | None = None
         self._suspend = False
 
         outer = QtWidgets.QVBoxLayout(self)
@@ -63,15 +65,44 @@ class ComponentEditor(QtWidgets.QGroupBox):
         form.setVerticalSpacing(6)
         outer.addLayout(form)
 
+        advanced_form: QtWidgets.QFormLayout | None = None
+
         for spec in schema:
             label = spec["label"]
             path = spec["path"]
             widget = self._create_widget(spec)
             self.widgets[path] = widget
-            form.addRow(label, widget)
+
+            if spec.get("advanced"):
+                if advanced_form is None:
+                    advanced_btn = QtWidgets.QPushButton("Advanced >>")
+                    advanced_btn.setCheckable(True)
+                    advanced_btn.setChecked(False)
+                    advanced_btn.toggled.connect(self._on_advanced_toggled)
+                    self._advanced_btn = advanced_btn
+
+                    container = QtWidgets.QWidget()
+                    container.setVisible(False)
+                    self._advanced_container = container
+                    advanced_form = QtWidgets.QFormLayout(container)
+                    advanced_form.setLabelAlignment(QtCore.Qt.AlignTop)
+                    advanced_form.setHorizontalSpacing(12)
+                    advanced_form.setVerticalSpacing(6)
+
+                    form.addRow(advanced_btn, container)
+
+                advanced_form.addRow(label, widget)
+            else:
+                form.addRow(label, widget)
 
     def set_runtime_status(self, message: str) -> None:
         self.runtime_status.setText(f"Runtime status: {message}")
+
+    def _on_advanced_toggled(self, checked: bool) -> None:
+        if self._advanced_container is not None:
+            self._advanced_container.setVisible(checked)
+        if self._advanced_btn is not None:
+            self._advanced_btn.setText("Advanced <<" if checked else "Advanced >>")
 
     def _create_widget(self, spec: dict[str, Any]) -> QtWidgets.QWidget:
         kind = spec["kind"]
