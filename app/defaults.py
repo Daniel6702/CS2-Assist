@@ -55,6 +55,10 @@ def default_profile() -> dict[str, Any]:
                 "manual_brake_window_ms": 150,
                 "manual_brake_max_ms": 170,
             },
+            "jump_throw": {
+                "enabled": False,
+                "key_name": "v",
+            },
             "recoil": {
                 "enabled": False,
                 "axis_strength_percent": {"x": 100.0, "y": 100.0},
@@ -118,6 +122,16 @@ def default_profile() -> dict[str, Any]:
                 "clicks_per_second": 8.0,
                 "click_hold_ms": 20,
                 "allowed_weapon_file": "./resources/weapon_codes.txt",
+            },
+            "flash_filter": {
+                "enabled": False,
+                "output": "",
+                "brightness_factor": 0.50,
+                "gamma_red": 1.42,
+                "gamma_green": 1.22,
+                "gamma_blue": 0.80,
+                "fade_seconds": 1.90,
+                "update_hz": 30.0,
             },
             "cv_trigger": {
                 "enabled": False,

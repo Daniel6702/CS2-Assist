@@ -53,6 +53,7 @@ def _state(weapon: str, *, allowed: bool = True) -> GameState:
         team="T",
         defusekit=False,
         is_scoped=False,
+        flashed=False,
     )
 
 

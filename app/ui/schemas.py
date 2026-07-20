@@ -37,6 +37,14 @@ def component_schemas() -> list[tuple[str, str, list[dict[str, Any]]]]:
             ],
         ),
         (
+            "jump_throw",
+            "Jump Throw",
+            [
+                {"path": "enabled", "label": "Enabled", "kind": "bool"},
+                {"path": "key_name", "label": "Key", "kind": "line", "default": "v"},
+            ],
+        ),
+        (
             "recoil",
             "Recoil Control",
             [

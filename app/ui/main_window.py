@@ -29,7 +29,7 @@ from app.ui.widgets.log_bridge import LogBridge
 
 
 _COMPONENT_SCHEMA_NAMES: Final[frozenset[str]] = frozenset(name for name, _title, _schema in component_schemas())
-_MOVEMENT_COMPONENTS: Final[tuple[str, ...]] = ("bhop", "snap_tap", "counter_strafe")
+_MOVEMENT_COMPONENTS: Final[tuple[str, ...]] = ("bhop", "snap_tap", "counter_strafe", "jump_throw")
 _PIXEL_TRIGGER_SHARED_KEYS: Final[tuple[str, ...]] = (
     "game_resolution",
     "display_resolution",
@@ -396,6 +396,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.misc_tab.load_config("kill_sound", deep_get(self.current_profile_data, "components.kill_sound", {}))
             self.misc_tab.load_config("bomb_timer", deep_get(self.current_profile_data, "components.bomb_timer", {}))
             self.misc_tab.load_config("auto_shoot", deep_get(self.current_profile_data, "components.auto_shoot", {}))
+            self.misc_tab.load_config("flash_filter", deep_get(self.current_profile_data, "components.flash_filter", {}))
             self._movement_hotkey_disabled.clear()
             self._configure_hotkeys()
         finally:
@@ -602,6 +603,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.misc_tab.load_config("kill_sound", deep_get(self.current_profile_data, "components.kill_sound", {}))
         elif name == "auto_shoot":
             self.misc_tab.load_config("auto_shoot", deep_get(self.current_profile_data, "components.auto_shoot", {}))
+        elif name == "flash_filter":
+            self.misc_tab.load_config("flash_filter", deep_get(self.current_profile_data, "components.flash_filter", {}))
         self.runtime.restart_component(name, self.current_profile_data)
         if save:
             self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)

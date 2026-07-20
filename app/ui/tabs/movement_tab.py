@@ -60,6 +60,7 @@ class MovementTab(BaseTab):
             "bhop": _ComponentSection("bhop", "Bhop", _schema_for("bhop"), device_service),
             "snap_tap": _ComponentSection("snap_tap", "Snap Tap / Null Binds", _schema_for("snap_tap"), device_service),
             "counter_strafe": _ComponentSection("counter_strafe", "Counter Strafe", _schema_for("counter_strafe"), device_service),
+            "jump_throw": _ComponentSection("jump_throw", "Jump Throw", _schema_for("jump_throw"), device_service),
         }
 
         # Row 1: Bhop and Snap Tap side by side
@@ -71,6 +72,8 @@ class MovementTab(BaseTab):
 
         # Row 2: Counter Strafe
         layout.addWidget(self.sections["counter_strafe"])
+
+        layout.addWidget(self.sections["jump_throw"])
 
         layout.addStretch(1)
 

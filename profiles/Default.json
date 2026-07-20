@@ -527,6 +527,19 @@
             "clicks_per_second": 30.0,
             "click_hold_ms": 20,
             "allowed_weapon_file": "./resources/weapon_codes.txt"
+        },
+        "flash_filter": {
+            "enabled": true,
+            "output": "DP-2",
+            "brightness_factor": 0.5,
+            "gamma_red": 1.42,
+            "gamma_green": 1.22,
+            "gamma_blue": 0.8,
+            "fade_seconds": 1.8
+        },
+        "jump_throw": {
+            "enabled": true,
+            "key_name": "v"
         }
     }
 }

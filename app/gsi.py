@@ -23,6 +23,22 @@ def _parse_int(value) -> int | None:
     return None
 
 
+def _parse_boolish(value) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int | float):
+        return value != 0
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in ("true", "yes", "on"):
+            return True
+        if normalized in ("false", "no", "off", ""):
+            return False
+        parsed = _parse_int(normalized)
+        return None if parsed is None else parsed != 0
+    return None
+
+
 @dataclass(frozen=True)
 class GameState:
     raw: dict
@@ -37,6 +53,7 @@ class GameState:
     team: str | None
     defusekit: bool | None
     is_scoped: bool | None
+    flashed: bool | None
 
     @classmethod
     def from_payload(cls, payload: dict) -> "GameState":
@@ -118,6 +135,8 @@ class GameState:
         else:
             is_scoped = None
 
+        flashed = _parse_boolish(player_state.get("flashed"))
+
         player_stats = player.get("match_stats", {}) or {}
         kills = _parse_int(player_stats.get("kills"))
 
@@ -134,6 +153,7 @@ class GameState:
             team=team,
             defusekit=defusekit_bool,
             is_scoped=is_scoped,
+            flashed=flashed,
         )
 
 

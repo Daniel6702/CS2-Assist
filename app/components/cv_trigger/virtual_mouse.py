@@ -30,6 +30,12 @@ class VirtualMouse:
             self.ui.emit(self._rel_y, dy)
 
     def click_once(self, hold_ms: int) -> None:
-        self.ui.emit(self._btn_left, 1)
+        self.press_left()
         time.sleep(max(1, hold_ms) / 1000.0)
+        self.release_left()
+
+    def press_left(self) -> None:
+        self.ui.emit(self._btn_left, 1)
+
+    def release_left(self) -> None:
         self.ui.emit(self._btn_left, 0)

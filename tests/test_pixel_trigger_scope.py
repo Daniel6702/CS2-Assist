@@ -49,8 +49,17 @@ class PixelTriggerScopeTests(unittest.TestCase):
 
         layout = selection_row.layout()
 
-        self.assertIsInstance(layout, QtWidgets.QHBoxLayout)
-        self.assertEqual(layout.count(), 2)
+        self.assertIsInstance(layout, QtWidgets.QGridLayout)
+        self.assertIsNotNone(layout.itemAtPosition(0, 0))
+        self.assertIsNotNone(layout.itemAtPosition(0, 1))
+        self.assertIsNotNone(layout.itemAtPosition(1, 0))
+        self.assertIsNotNone(layout.itemAtPosition(1, 1))
+        self.assertIsNotNone(layout.itemAtPosition(2, 0))
+        self.assertIsNotNone(layout.itemAtPosition(2, 1))
+        self.assertIsNotNone(layout.itemAtPosition(3, 0))
+        self.assertIsNotNone(layout.itemAtPosition(3, 1))
+        self.assertIsNone(layout.itemAtPosition(4, 0))
+        self.assertIsNotNone(layout.itemAtPosition(4, 1))
 
     def test_sniper_scope_grid_is_twelve_by_twelve(self) -> None:
         tab = PixelTriggerTab(DeviceService())

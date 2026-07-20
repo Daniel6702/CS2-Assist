@@ -7,6 +7,7 @@ from PySide6 import QtCore, QtWidgets
 from app.ui.tabs.base import BaseTab
 from app.ui.widgets.auto_shoot_section import AutoShootSection
 from app.ui.widgets.bomb_timer_section import BombTimerSection
+from app.ui.widgets.flash_filter_section import FlashFilterSection
 from app.ui.widgets.kill_sound_section import KillSoundSection
 
 
@@ -22,11 +23,13 @@ class MiscTab(BaseTab):
         self.kill_sound = KillSoundSection()
         self.bomb_timer = BombTimerSection()
         self.auto_shoot = AutoShootSection()
+        self.flash_filter = FlashFilterSection()
 
         sections = (
             ("kill_sound", self.kill_sound),
             ("bomb_timer", self.bomb_timer),
             ("auto_shoot", self.auto_shoot),
+            ("flash_filter", self.flash_filter),
         )
         for section_name, section in sections:
             section.changed.connect(lambda _checked=False, name=section_name: self._emit_section(name))
@@ -43,15 +46,17 @@ class MiscTab(BaseTab):
             "kill_sound": self.kill_sound.extract_config(),
             "bomb_timer": self.bomb_timer.extract_config(),
             "auto_shoot": self.auto_shoot.extract_config(),
+            "flash_filter": self.flash_filter.extract_config(),
         }
 
     def _emit_section(self, section_name: str) -> None:
         section = self._sections()[section_name]
         self.config_changed.emit(section_name, section.extract_config())
 
-    def _sections(self) -> dict[str, KillSoundSection | BombTimerSection | AutoShootSection]:
+    def _sections(self) -> dict[str, KillSoundSection | BombTimerSection | AutoShootSection | FlashFilterSection]:
         return {
             "kill_sound": self.kill_sound,
             "bomb_timer": self.bomb_timer,
             "auto_shoot": self.auto_shoot,
+            "flash_filter": self.flash_filter,
         }
