@@ -6,7 +6,7 @@ from typing import Any, Callable
 from app.components.base import BaseComponent
 from app.components.bhop import BhopComponent
 from app.components.counter_strafe import CounterStrafeComponent
-from app.components import AutoShootComponent, BombTimerComponent, CVTriggerComponent, FlashFilterComponent, JumpThrowComponent, KillSoundComponent
+from app.components import AutoAirStrafeComponent, AutoShootComponent, BombTimerComponent, CVTriggerComponent, FlashFilterComponent, JumpThrowComponent, KillSoundComponent
 from app.components.pixel_trigger import PixelTriggerComponent
 from app.components.recoil import RecoilComponent
 from app.components.snap_tap import SnapTapComponent
@@ -22,6 +22,7 @@ class RuntimeManager:
             "snap_tap": SnapTapComponent(),
             "counter_strafe": CounterStrafeComponent(),
             "jump_throw": JumpThrowComponent(),
+            "auto_air_strafe": AutoAirStrafeComponent(),
             "recoil": RecoilComponent(),
             "pixel_trigger": PixelTriggerComponent(),
             "cv_trigger": CVTriggerComponent(),
@@ -56,8 +57,11 @@ class RuntimeManager:
         if not isinstance(display_resolution, dict):
             display_resolution = {"width": 1920, "height": 1080}
 
-        if name in {"bhop", "snap_tap", "counter_strafe", "jump_throw"}:
+        if name in {"bhop", "snap_tap", "counter_strafe", "jump_throw", "auto_air_strafe"}:
             cfg["device_path"] = keyboard_device_path
+
+        if name == "auto_air_strafe":
+            cfg["game_sensitivity"] = game_sensitivity
 
         if name == "recoil":
             sensitivity = cfg.get("sensitivity", {})

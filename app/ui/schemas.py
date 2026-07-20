@@ -45,6 +45,17 @@ def component_schemas() -> list[tuple[str, str, list[dict[str, Any]]]]:
             ],
         ),
         (
+            "auto_air_strafe",
+            "Auto Air Strafe",
+            [
+                {"path": "enabled", "label": "Enabled", "kind": "bool"},
+                {"path": "key_name", "label": "Activation / jump key", "kind": "line", "default": "space"},
+                {"path": "strafe_count", "label": "Number of strafes", "kind": "int", "min": 1, "max": 100, "default": 8},
+                {"path": "jump_duration_ms", "label": "Jump duration ms", "kind": "int", "min": 100, "max": 2000, "default": 800, "advanced": True},
+                {"path": "start_delay_ms", "label": "Strafe start delay ms", "kind": "int", "min": 0, "max": 1000, "default": 0, "advanced": True},
+            ],
+        ),
+        (
             "recoil",
             "Recoil Control",
             [

@@ -29,7 +29,7 @@ from app.ui.widgets.log_bridge import LogBridge
 
 
 _COMPONENT_SCHEMA_NAMES: Final[frozenset[str]] = frozenset(name for name, _title, _schema in component_schemas())
-_MOVEMENT_COMPONENTS: Final[tuple[str, ...]] = ("bhop", "snap_tap", "counter_strafe", "jump_throw")
+_MOVEMENT_COMPONENTS: Final[tuple[str, ...]] = ("bhop", "snap_tap", "counter_strafe", "jump_throw", "auto_air_strafe")
 _PIXEL_TRIGGER_SHARED_KEYS: Final[tuple[str, ...]] = (
     "game_resolution",
     "display_resolution",
@@ -487,7 +487,7 @@ class MainWindow(QtWidgets.QMainWindow):
         finally:
             self._loading_profile = False
         self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)
-        for name in ("bhop", "snap_tap", "counter_strafe", "recoil", "pixel_trigger", "cv_trigger"):
+        for name in ("bhop", "snap_tap", "counter_strafe", "auto_air_strafe", "recoil", "pixel_trigger", "cv_trigger"):
             self.runtime.restart_component(name, self.current_profile_data)
 
     def _on_hotkeys_changed(self) -> None:

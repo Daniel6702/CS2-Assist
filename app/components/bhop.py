@@ -127,6 +127,10 @@ class BhopComponent(BaseComponent):
                 spammer = self._spammer
             if spammer is None:
                 return False
+            if self._ctrl_blocked():
+                if value != 2:
+                    spammer.enabled = False
+                return False
             if not self.automation_permitted():
                 if value != 2:
                     spammer.enabled = False

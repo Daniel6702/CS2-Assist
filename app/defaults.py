@@ -59,6 +59,13 @@ def default_profile() -> dict[str, Any]:
                 "enabled": False,
                 "key_name": "v",
             },
+            "auto_air_strafe": {
+                "enabled": False,
+                "key_name": "space",
+                "strafe_count": 8,
+                "jump_duration_ms": 800,
+                "start_delay_ms": 0,
+            },
             "recoil": {
                 "enabled": False,
                 "axis_strength_percent": {"x": 100.0, "y": 100.0},

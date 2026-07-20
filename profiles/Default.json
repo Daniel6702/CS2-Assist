@@ -538,8 +538,15 @@
             "fade_seconds": 1.8
         },
         "jump_throw": {
-            "enabled": true,
+            "enabled": false,
             "key_name": "v"
+        },
+        "auto_air_strafe": {
+            "enabled": false,
+            "key_name": "c",
+            "strafe_count": 4,
+            "jump_duration_ms": 780,
+            "start_delay_ms": 500
         }
     }
 }

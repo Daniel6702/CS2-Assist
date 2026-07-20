@@ -8,6 +8,6 @@
 
 - Debugging tab with log, aim target overlay, bounding box overlay
 
-- Anti Flash filter
-
 - Defuse timer. I.e. when Ct start defusing T can tell for how long.
+
+- Auto jump strafing
