@@ -7,7 +7,6 @@ from typing import Any
 
 from app.components.base import BaseComponent
 from app.gsi import GameState
-from app.utils.input_safety import humanize_jitter, humanize_sleep
 
 from . import aim_motion
 from .curve_config import build_curve_library
@@ -450,7 +449,6 @@ class CVTriggerComponent(BaseComponent):
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
-        self.status("Started.")
 
     def stop(self) -> None:
         super().stop()
@@ -504,17 +502,8 @@ class CVTriggerComponent(BaseComponent):
         anti_oscillation_reserve_counts = max(0, int(1 if anti_oscillation_reserve_raw is None else anti_oscillation_reserve_raw))
         anti_oscillation_lock_frames = max(0, int(2 if anti_oscillation_lock_raw is None else anti_oscillation_lock_raw))
 
-        _sf = dict(config.get("_safety", {}))
-        _enabled = bool(_sf.get("enabled", False))
-        _pred_frac = float(_sf.get("jitter_prediction_fraction", 0.0))
-        _sleep_frac = float(_sf.get("jitter_sleep_fraction", 0.0))
-        _click_hold_frac = float(_sf.get("jitter_click_hold_fraction", 0.0))
-        _cooldown_frac = float(_sf.get("jitter_cooldown_fraction", 0.0))
-        _eased = bool(_sf.get("eased_movement_enabled", False))
-        _obscure = bool(_sf.get("obscure_device_names", False))
-
         try:
-            vmouse = VirtualMouse(obscure=_obscure)
+            vmouse = VirtualMouse()
         except Exception as exc:
             self.status(str(exc), "error")
             self._thread = None
@@ -559,7 +548,7 @@ class CVTriggerComponent(BaseComponent):
         grab = Grab(monitor, status_callback=self.status)
         grab.start()
         while not self._stop.is_set() and grab.frame() is None:
-            humanize_sleep(0.01, fraction=_sleep_frac if _enabled else 0.0, min_val=0.005)
+            time.sleep(0.01)
 
         scope_detector = ScopeDetector()
         pos_smoother = PositionSmoother(alpha=2.0 / (max(1, int(position_smoothing_frames)) + 1.0))
@@ -572,10 +561,11 @@ class CVTriggerComponent(BaseComponent):
         reversal_locks: dict[str, int] = {name: 0 for name in enabled_configs}
         previous_active: tuple[str, ...] = ()
         status_every = 0.0
+        self.status("Started.")
 
         try:
             while not self._stop.is_set():
-                humanize_sleep(0.001, fraction=_sleep_frac if _enabled else 0.0, min_val=0.0005)
+                time.sleep(0.001)
                 frame = grab.frame()
                 if frame is None:
                     continue
@@ -591,7 +581,7 @@ class CVTriggerComponent(BaseComponent):
                     pos_smoother.reset_many(settle.keys())
                     previous_active = ()
                     self._set_overlay_state(False)
-                    humanize_sleep(0.01, fraction=_sleep_frac if _enabled else 0.0, min_val=0.005)
+                    time.sleep(0.01)
                     continue
 
                 current_weapon = self._current_weapon_name()
@@ -968,21 +958,17 @@ class CVTriggerComponent(BaseComponent):
                             pos_smoother.reset(m["name"])
                     mdx, mdy = _sum_motion_counts(motions)
                     if mdx or mdy:
-                        if _eased and (abs(mdx) > 15 or abs(mdy) > 15):
-                            vmouse.eased_emit_rel(mdx, mdy)
-                        else:
-                            vmouse.emit_rel(mdx, mdy)
+                        vmouse.emit_rel(mdx, mdy)
 
                 if click_ready:
                     best_click = min(click_ready, key=lambda item: item["d2"])
                     hold_ms = int(best_click["cfg"]["CLICK_HOLD_MS"])
-                    jittered_hold = humanize_jitter(hold_ms, fraction=_click_hold_frac if _enabled else 0.0, min_val=1)
-                    vmouse.click_once(int(jittered_hold))
+                    vmouse.click_once(hold_ms)
                     triggered_names = {item["name"] for item in click_ready}
                     for triggered_name in triggered_names:
                         triggered_cfg = enabled_configs[triggered_name]
                         base_cooldown = float(triggered_cfg["COOLDOWN_MS"]) / 1000.0
-                        cooldown_until[triggered_name] = best_click["now"] + humanize_jitter(base_cooldown, fraction=_cooldown_frac if _enabled else 0.0, min_val=0.01)
+                        cooldown_until[triggered_name] = best_click["now"] + base_cooldown
                         settle[triggered_name] = 0
 
         except Exception as exc:

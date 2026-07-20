@@ -7,6 +7,8 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import Callable
 
+from app.utils.input_safety import OBSCURED_KEYBOARD_NAME
+
 try:
     from evdev import InputDevice, UInput, ecodes, list_devices
 except ImportError:  # pragma: no cover
@@ -53,12 +55,12 @@ def find_keyboard(required_keys: set[int]) -> str:
     raise RuntimeError("Could not auto-detect a matching keyboard device.")
 
 
-def create_virtual_keyboard(real: InputDevice, extra_keys: set[int], name: str) -> UInput:
+def create_virtual_keyboard(real: InputDevice, extra_keys: set[int]) -> UInput:
     keys = set(real.capabilities(absinfo=False).get(ecodes.EV_KEY, []))
     keys.update(extra_keys)
     ui = UInput(
         {ecodes.EV_KEY: sorted(keys)},
-        name=name,
+        name=OBSCURED_KEYBOARD_NAME,
         bustype=0x03,
         vendor=0x1234,
         product=0x5678,
@@ -75,7 +77,6 @@ class _SharedKeyboardHub:
         self.ui = create_virtual_keyboard(
             self.real,
             extra_keys=set(),
-            name="cs2-unified-shared-keyboard",
         )
         self.real.grab()
 

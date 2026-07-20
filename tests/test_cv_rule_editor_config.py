@@ -117,6 +117,31 @@ class CVRuleEditorCanonicalTests(unittest.TestCase):
 
 
 class CVTriggerEditorCurveIntegrationTests(unittest.TestCase):
+    def test_runtime_status_is_limited_to_lifecycle_labels(self) -> None:
+        editor = CVTriggerEditor("cv_trigger", "CV Trigger", device_service=DeviceService())
+        editor.load_config({"enabled": True, "configs": {"rule": _canonical_rule()}})
+
+        editor.set_runtime_status("Active CV config(s): rule | weapon=ak47 | targets=t")
+
+        self.assertEqual(editor.runtime_status.text(), "Runtime: Active")
+
+        editor.mark_runtime_waiting()
+        self.assertEqual(editor.runtime_status.text(), "Runtime: Waiting")
+
+        editor.set_runtime_status("No active CV config matched. weapon=<unknown>")
+        self.assertEqual(editor.runtime_status.text(), "Runtime: Waiting")
+
+        editor.set_runtime_status("Started.")
+        self.assertEqual(editor.runtime_status.text(), "Runtime: Active")
+
+    def test_runtime_status_is_stopped_when_disabled(self) -> None:
+        editor = CVTriggerEditor("cv_trigger", "CV Trigger", device_service=DeviceService())
+        editor.load_config({"enabled": False, "configs": {"rule": _canonical_rule()}})
+
+        editor.set_runtime_status("Started.")
+
+        self.assertEqual(editor.runtime_status.text(), "Runtime: Stopped")
+
     def test_rule_editors_receive_global_curve_library(self) -> None:
         editor = CVTriggerEditor("cv_trigger", "CV Trigger", device_service=DeviceService())
         editor.load_config({

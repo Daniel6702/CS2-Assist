@@ -6,7 +6,7 @@ from typing import Any, Callable
 from app.components.base import BaseComponent
 from app.components.bhop import BhopComponent
 from app.components.counter_strafe import CounterStrafeComponent
-from app.components import BombTimerComponent, CVTriggerComponent, KillSoundComponent
+from app.components import AutoShootComponent, BombTimerComponent, CVTriggerComponent, KillSoundComponent
 from app.components.pixel_trigger import PixelTriggerComponent
 from app.components.recoil import RecoilComponent
 from app.components.snap_tap import SnapTapComponent
@@ -26,6 +26,7 @@ class RuntimeManager:
             "cv_trigger": CVTriggerComponent(),
             "kill_sound": KillSoundComponent(),
             "bomb_timer": BombTimerComponent(),
+            "auto_shoot": AutoShootComponent(),
         }
         for component in self.components.values():
             component.set_status_callback(self.status_callback)
@@ -39,7 +40,6 @@ class RuntimeManager:
         components_cfg = profile.get("components", {}) or {}
         cfg = deepcopy(dict(components_cfg.get(name, {})))
         shared = dict((profile.get("app", {}) or {}).get("shared", {}) or {})
-        app_safety = dict((profile.get("app", {}) or {}).get("safety", {}))
 
         keyboard_device_path = str(shared.get("keyboard_device_path", "") or "")
         game_sensitivity = float(shared.get("game_sensitivity", 1.0) or 1.0)
@@ -48,6 +48,11 @@ class RuntimeManager:
             game_resolution = cfg.get("game_resolution", {"width": 1600, "height": 1200})
         if not isinstance(game_resolution, dict):
             game_resolution = {"width": 1600, "height": 1200}
+        display_resolution = shared.get("display_resolution")
+        if not isinstance(display_resolution, dict):
+            display_resolution = cfg.get("display_resolution", {"width": 1920, "height": 1080})
+        if not isinstance(display_resolution, dict):
+            display_resolution = {"width": 1920, "height": 1080}
 
         if name in {"bhop", "snap_tap", "counter_strafe"}:
             cfg["device_path"] = keyboard_device_path
@@ -64,6 +69,19 @@ class RuntimeManager:
                 "width": max(1, int(game_resolution.get("width", 1600) or 1600)),
                 "height": max(1, int(game_resolution.get("height", 1200) or 1200)),
             }
+
+        if name == "pixel_trigger":
+            cfg["game_resolution"] = {
+                "width": max(1, int(game_resolution.get("width", 1600) or 1600)),
+                "height": max(1, int(game_resolution.get("height", 1200) or 1200)),
+            }
+            cfg["display_resolution"] = {
+                "width": max(1, int(display_resolution.get("width", 1920) or 1920)),
+                "height": max(1, int(display_resolution.get("height", 1080) or 1080)),
+            }
+            cfg["game_resolution_stretched"] = bool(
+                shared.get("game_resolution_stretched", cfg.get("stretched", True)),
+            )
 
         if name == "cv_trigger":
             cfg["user_sens"] = game_sensitivity
@@ -86,11 +104,6 @@ class RuntimeManager:
             provider = getattr(recoil_component, "get_alignment_state", None)
             if callable(provider):
                 cfg["recoil_runtime_provider"] = provider
-
-        if name in {"recoil", "pixel_trigger", "cv_trigger"}:
-            cfg["_safety"] = deepcopy(dict(app_safety.get(name, {})))
-            cfg["_safety"]["enabled"] = bool(app_safety.get("enabled", False))
-            cfg["_safety"]["obscure_device_names"] = bool(app_safety.get("obscure_device_names", False))
 
         return cfg
 
@@ -117,10 +130,18 @@ class RuntimeManager:
     def restart_component(self, name: str, profile: dict[str, Any]) -> None:
         component = self.components[name]
         cfg = self._effective_component_config(profile, name)
+        now_enabled = bool(cfg.get("enabled", False))
+
+        if name == "cv_trigger" and component.enabled and now_enabled:
+            component.stop()
+            component.configure(cfg)
+            component.set_runtime_gate(self._gsi_gate_open, self._gsi_gate_reason)
+            component.start()
+            return
+
         component.configure(cfg)
         component.set_runtime_gate(self._gsi_gate_open, self._gsi_gate_reason)
 
-        now_enabled = bool(cfg.get("enabled", False))
         if component.enabled and now_enabled:
             # Already running and should stay running — just push config.
             # The thread picks it up from self._config on its next iteration

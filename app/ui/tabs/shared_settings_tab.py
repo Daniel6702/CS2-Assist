@@ -5,16 +5,8 @@ from typing import Any
 from PySide6 import QtCore, QtWidgets
 
 from app.device_service import DeviceService
+from app.platform.monitor import default_monitor_geometry
 from app.ui.tabs.base import BaseTab
-
-
-def _jitter_spin() -> QtWidgets.QDoubleSpinBox:
-    w = QtWidgets.QDoubleSpinBox()
-    w.setRange(0.0, 0.50)
-    w.setDecimals(2)
-    w.setSingleStep(0.01)
-    w.setSuffix("")
-    return w
 
 
 class SharedSettingsTab(BaseTab):
@@ -54,6 +46,13 @@ class SharedSettingsTab(BaseTab):
         resolution_layout.addWidget(self.shared_game_width)
         resolution_layout.addWidget(QtWidgets.QLabel("Height"))
         resolution_layout.addWidget(self.shared_game_height)
+
+        self.shared_game_stretched = QtWidgets.QCheckBox("Stretched")
+        self.shared_game_stretched.setToolTip(
+            "Use when the in-game resolution is stretched to the display resolution.",
+        )
+        resolution_layout.addWidget(self.shared_game_stretched)
+
         resolution_layout.addStretch(1)
         shared_layout.addRow("Game Resolution", resolution_row)
 
@@ -73,7 +72,11 @@ class SharedSettingsTab(BaseTab):
         display_resolution_layout.addStretch(1)
         shared_layout.addRow("Display Resolution", display_resolution_row)
 
-        layout.addWidget(shared_group)
+        shared_gsi_row = QtWidgets.QWidget()
+        shared_gsi_layout = QtWidgets.QHBoxLayout(shared_gsi_row)
+        shared_gsi_layout.setContentsMargins(0, 0, 0, 0)
+        shared_gsi_layout.addWidget(shared_group, 1)
+        layout.addWidget(shared_gsi_row)
 
         # Game State Integration section
         gsi_group = QtWidgets.QGroupBox("Game State Integration")
@@ -92,10 +95,7 @@ class SharedSettingsTab(BaseTab):
         self.gsi_port.setRange(1, 65535)
         gsi_layout.addRow("Port", self.gsi_port)
 
-        self.gsi_last_state = QtWidgets.QLabel("No data yet.")
-        gsi_layout.addRow("Last state", self.gsi_last_state)
-
-        layout.addWidget(gsi_group)
+        shared_gsi_layout.addWidget(gsi_group, 1)
 
         hotkeys_group = QtWidgets.QGroupBox("Global Hotkeys")
         hotkeys_outer = QtWidgets.QVBoxLayout(hotkeys_group)
@@ -146,84 +146,6 @@ class SharedSettingsTab(BaseTab):
 
         layout.addWidget(hotkeys_group)
 
-        # Safety & Anti-Detection section
-        safety_group = QtWidgets.QGroupBox("Safety / Anti-Detection")
-        safety_outer = QtWidgets.QVBoxLayout(safety_group)
-        safety_outer.setSpacing(8)
-
-        # Master toggles row
-        toggles_row = QtWidgets.QHBoxLayout()
-        toggles_row.setSpacing(24)
-        self.safety_enabled = QtWidgets.QCheckBox("Enable safety measures")
-        toggles_row.addWidget(self.safety_enabled)
-        self.safety_obscure_names = QtWidgets.QCheckBox("Obscure uinput device names")
-        toggles_row.addWidget(self.safety_obscure_names)
-        toggles_row.addStretch(1)
-        safety_outer.addLayout(toggles_row)
-
-        # Three horizontal sub-boxes for each component
-        boxes_row = QtWidgets.QHBoxLayout()
-        boxes_row.setSpacing(8)
-
-        def _make_comp_box(title: str, fields: list[tuple[str, QtWidgets.QWidget]]) -> QtWidgets.QGroupBox:
-            box = QtWidgets.QGroupBox(title)
-            fl = QtWidgets.QFormLayout(box)
-            fl.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
-            fl.setHorizontalSpacing(10)
-            fl.setVerticalSpacing(4)
-            fl.setContentsMargins(6, 6, 6, 6)
-            for label, widget in fields:
-                fl.addRow(label, widget)
-            return box
-
-        # -- Recoil box
-        self.safety_recoil_step = _jitter_spin()
-        self.safety_recoil_noise_mix = _jitter_spin()
-        self.safety_recoil_noise_decay = _jitter_spin()
-        recoil_box = _make_comp_box("Recoil", [
-            ("Step timing jitter", self.safety_recoil_step),
-            ("Noise mix jitter", self.safety_recoil_noise_mix),
-            ("Noise decay jitter", self.safety_recoil_noise_decay),
-        ])
-        boxes_row.addWidget(recoil_box)
-
-        # -- Pixel Trigger box
-        self.safety_pixel_cooldown = _jitter_spin()
-        self.safety_pixel_click_delay = _jitter_spin()
-        self.safety_pixel_poll = _jitter_spin()
-        pixel_box = _make_comp_box("Pixel Trigger", [
-            ("Cooldown jitter", self.safety_pixel_cooldown),
-            ("Click delay jitter", self.safety_pixel_click_delay),
-            ("Poll interval jitter", self.safety_pixel_poll),
-        ])
-        boxes_row.addWidget(pixel_box)
-
-        # -- CV Aim Assist box
-        self.safety_cv_prediction = _jitter_spin()
-        self.safety_cv_sleep = _jitter_spin()
-        self.safety_cv_click_hold = _jitter_spin()
-        self.safety_cv_cooldown = _jitter_spin()
-        self.safety_cv_eased = QtWidgets.QCheckBox()
-        cv_box = _make_comp_box("CV Aim Assist", [
-            ("Prediction timing jitter", self.safety_cv_prediction),
-            ("Loop sleep jitter", self.safety_cv_sleep),
-            ("Click hold jitter", self.safety_cv_click_hold),
-            ("Cooldown jitter", self.safety_cv_cooldown),
-            ("Eased movement (multi-frame)", self.safety_cv_eased),
-        ])
-        boxes_row.addWidget(cv_box)
-
-        safety_outer.addLayout(boxes_row)
-
-        safety_note = QtWidgets.QLabel(
-            "All values default to 0 (disabled). Set between 0.01–0.50 to add "
-            "random variance that reduces machine-perfect timing signals."
-        )
-        safety_note.setWordWrap(True)
-        safety_note.setStyleSheet("color: #666;")
-        safety_outer.addWidget(safety_note)
-
-        layout.addWidget(safety_group)
         layout.addStretch(1)
 
     def refresh_devices(self) -> None:
@@ -239,7 +161,7 @@ class SharedSettingsTab(BaseTab):
         self.shared_keyboard_device.blockSignals(False)
 
     def set_last_state(self, message: str) -> None:
-        self.gsi_last_state.setText(message)
+        pass
 
     def load_config(self, config: dict[str, Any]) -> None:
         # shared settings
@@ -252,10 +174,16 @@ class SharedSettingsTab(BaseTab):
             game_resolution = {"width": 1600, "height": 1200}
         self.shared_game_width.setValue(max(1, int(game_resolution.get("width", 1600) or 1600)))
         self.shared_game_height.setValue(max(1, int(game_resolution.get("height", 1200) or 1200)))
+        self.shared_game_stretched.setChecked(bool(shared.get("game_resolution_stretched", True)))
 
-        display_resolution = shared.get("display_resolution", {"width": 1920, "height": 1080})
-        if not isinstance(display_resolution, dict):
-            display_resolution = {"width": 1920, "height": 1080}
+        # Auto-detect primary monitor resolution; fall back to profile value, then 1920x1080.
+        try:
+            geom = default_monitor_geometry()
+            display_resolution = {"width": geom.width, "height": geom.height}
+        except Exception:
+            display_resolution = shared.get("display_resolution")
+            if not isinstance(display_resolution, dict):
+                display_resolution = {"width": 1920, "height": 1080}
         self.shared_display_width.setValue(max(1, int(display_resolution.get("width", 1920) or 1920)))
         self.shared_display_height.setValue(max(1, int(display_resolution.get("height", 1080) or 1080)))
 
@@ -273,27 +201,6 @@ class SharedSettingsTab(BaseTab):
         self.hotkey_stop_all.setText(str(hotkeys.get("stop_all", "F5") or "F5"))
         self.hotkey_overlay.setText(str(hotkeys.get("overlay", "Insert") or "Insert"))
 
-        safety = config.get("safety", {})
-        self.safety_enabled.setChecked(bool(safety.get("enabled", False)))
-        self.safety_obscure_names.setChecked(bool(safety.get("obscure_device_names", False)))
-
-        recoil_s = safety.get("recoil", {})
-        self.safety_recoil_step.setValue(float(recoil_s.get("jitter_step_fraction", 0.0)))
-        self.safety_recoil_noise_mix.setValue(float(recoil_s.get("jitter_noise_mix_fraction", 0.0)))
-        self.safety_recoil_noise_decay.setValue(float(recoil_s.get("jitter_noise_decay_fraction", 0.0)))
-
-        pixel_s = safety.get("pixel_trigger", {})
-        self.safety_pixel_cooldown.setValue(float(pixel_s.get("jitter_cooldown_fraction", 0.0)))
-        self.safety_pixel_click_delay.setValue(float(pixel_s.get("jitter_click_delay_fraction", 0.0)))
-        self.safety_pixel_poll.setValue(float(pixel_s.get("jitter_poll_fraction", 0.0)))
-
-        cv_s = safety.get("cv_trigger", {})
-        self.safety_cv_prediction.setValue(float(cv_s.get("jitter_prediction_fraction", 0.0)))
-        self.safety_cv_sleep.setValue(float(cv_s.get("jitter_sleep_fraction", 0.0)))
-        self.safety_cv_click_hold.setValue(float(cv_s.get("jitter_click_hold_fraction", 0.0)))
-        self.safety_cv_cooldown.setValue(float(cv_s.get("jitter_cooldown_fraction", 0.0)))
-        self.safety_cv_eased.setChecked(bool(cv_s.get("eased_movement_enabled", False)))
-
     def extract_config(self) -> dict[str, Any]:
         return {
             "shared": {
@@ -303,6 +210,7 @@ class SharedSettingsTab(BaseTab):
                     "width": self.shared_game_width.value(),
                     "height": self.shared_game_height.value(),
                 },
+                "game_resolution_stretched": self.shared_game_stretched.isChecked(),
                 "display_resolution": {
                     "width": self.shared_display_width.value(),
                     "height": self.shared_display_height.value(),
@@ -320,26 +228,5 @@ class SharedSettingsTab(BaseTab):
                 "movement": self.hotkey_movement.text().strip() or "F4",
                 "stop_all": self.hotkey_stop_all.text().strip() or "F5",
                 "overlay": self.hotkey_overlay.text().strip() or "Insert",
-            },
-            "safety": {
-                "enabled": self.safety_enabled.isChecked(),
-                "obscure_device_names": self.safety_obscure_names.isChecked(),
-                "recoil": {
-                    "jitter_step_fraction": self.safety_recoil_step.value(),
-                    "jitter_noise_mix_fraction": self.safety_recoil_noise_mix.value(),
-                    "jitter_noise_decay_fraction": self.safety_recoil_noise_decay.value(),
-                },
-                "pixel_trigger": {
-                    "jitter_cooldown_fraction": self.safety_pixel_cooldown.value(),
-                    "jitter_click_delay_fraction": self.safety_pixel_click_delay.value(),
-                    "jitter_poll_fraction": self.safety_pixel_poll.value(),
-                },
-                "cv_trigger": {
-                    "jitter_prediction_fraction": self.safety_cv_prediction.value(),
-                    "jitter_sleep_fraction": self.safety_cv_sleep.value(),
-                    "jitter_click_hold_fraction": self.safety_cv_click_hold.value(),
-                    "jitter_cooldown_fraction": self.safety_cv_cooldown.value(),
-                    "eased_movement_enabled": self.safety_cv_eased.isChecked(),
-                },
             },
         }

@@ -409,6 +409,10 @@ class DefaultProfileCanonicalTests(unittest.TestCase):
     def test_default_shared_settings_have_game_resolution(self) -> None:
         shared = default_profile()["app"]["shared"]
         self.assertEqual(shared["game_resolution"], {"width": 1600, "height": 1200})
+        self.assertTrue(shared["game_resolution_stretched"])
+
+    def test_default_profile_has_no_safety_settings(self) -> None:
+        self.assertNotIn("safety", default_profile()["app"])
 
     def test_default_cv_trigger_has_no_capture_settings(self) -> None:
         cv = default_profile()["components"]["cv_trigger"]
@@ -481,6 +485,10 @@ class CheckedInProfileCanonicalTests(unittest.TestCase):
     def test_shared_settings_have_game_resolution(self) -> None:
         shared = self.profile.get("app", {}).get("shared", {})
         self.assertEqual(shared.get("game_resolution"), {"width": 1600, "height": 1200})
+        self.assertTrue(shared.get("game_resolution_stretched"))
+
+    def test_checked_in_profile_has_no_safety_settings(self) -> None:
+        self.assertNotIn("safety", self.profile.get("app", {}))
 
     def test_cv_trigger_has_no_capture_settings(self) -> None:
         self.assertNotIn("monitor", self.cv)

@@ -30,6 +30,12 @@ from app.ui.widgets.log_bridge import LogBridge
 
 _COMPONENT_SCHEMA_NAMES: Final[frozenset[str]] = frozenset(name for name, _title, _schema in component_schemas())
 _MOVEMENT_COMPONENTS: Final[tuple[str, ...]] = ("bhop", "snap_tap", "counter_strafe")
+_PIXEL_TRIGGER_SHARED_KEYS: Final[tuple[str, ...]] = (
+    "game_resolution",
+    "display_resolution",
+    "stretched",
+    "game_resolution_stretched",
+)
 
 
 def _deep_merge_preserving_hidden(base: dict[str, Any], update: dict[str, Any]) -> dict[str, Any]:
@@ -40,6 +46,41 @@ def _deep_merge_preserving_hidden(base: dict[str, Any], update: dict[str, Any]) 
         else:
             merged[key] = value
     return merged
+
+
+def _resolution_config(value: Any, default: dict[str, int]) -> dict[str, int]:
+    if not isinstance(value, dict):
+        return deep_copy(default)
+    return {
+        "width": max(1, int(value.get("width", default["width"]) or default["width"])),
+        "height": max(1, int(value.get("height", default["height"]) or default["height"])),
+    }
+
+
+def _pixel_trigger_config_with_shared_settings(
+    pixel_trigger_cfg: dict[str, Any],
+    shared_cfg: dict[str, Any],
+) -> dict[str, Any]:
+    cfg = deep_copy(pixel_trigger_cfg)
+    cfg["game_resolution"] = _resolution_config(
+        shared_cfg.get("game_resolution", cfg.get("game_resolution")),
+        {"width": 1920, "height": 1080},
+    )
+    cfg["display_resolution"] = _resolution_config(
+        shared_cfg.get("display_resolution", cfg.get("display_resolution")),
+        {"width": 1920, "height": 1080},
+    )
+    cfg["game_resolution_stretched"] = bool(
+        shared_cfg.get("game_resolution_stretched", cfg.get("stretched", True)),
+    )
+    return cfg
+
+
+def _without_pixel_trigger_shared_keys(config: dict[str, Any]) -> dict[str, Any]:
+    cleaned = deep_copy(config)
+    for key in _PIXEL_TRIGGER_SHARED_KEYS:
+        cleaned.pop(key, None)
+    return cleaned
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -153,6 +194,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.shared_settings_tab.shared_game_sensitivity.valueChanged.connect(self._on_shared_settings_changed)
         self.shared_settings_tab.shared_game_width.valueChanged.connect(self._on_shared_settings_changed)
         self.shared_settings_tab.shared_game_height.valueChanged.connect(self._on_shared_settings_changed)
+        self.shared_settings_tab.shared_game_stretched.stateChanged.connect(self._on_shared_settings_changed)
+        self.shared_settings_tab.shared_display_width.valueChanged.connect(self._on_shared_settings_changed)
+        self.shared_settings_tab.shared_display_height.valueChanged.connect(self._on_shared_settings_changed)
         self.shared_settings_tab.gsi_enabled.stateChanged.connect(self._on_gsi_changed)
         self.shared_settings_tab.gsi_host.editingFinished.connect(self._on_gsi_changed)
         self.shared_settings_tab.gsi_port.valueChanged.connect(self._on_gsi_changed)
@@ -162,20 +206,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.shared_settings_tab.hotkey_movement.editingFinished.connect(self._on_hotkeys_changed)
         self.shared_settings_tab.hotkey_stop_all.editingFinished.connect(self._on_hotkeys_changed)
         self.shared_settings_tab.hotkey_overlay.editingFinished.connect(self._on_hotkeys_changed)
-
-        self.shared_settings_tab.safety_enabled.stateChanged.connect(self._on_safety_changed)
-        self.shared_settings_tab.safety_obscure_names.stateChanged.connect(self._on_safety_changed)
-        self.shared_settings_tab.safety_recoil_step.valueChanged.connect(self._on_safety_changed)
-        self.shared_settings_tab.safety_recoil_noise_mix.valueChanged.connect(self._on_safety_changed)
-        self.shared_settings_tab.safety_recoil_noise_decay.valueChanged.connect(self._on_safety_changed)
-        self.shared_settings_tab.safety_pixel_cooldown.valueChanged.connect(self._on_safety_changed)
-        self.shared_settings_tab.safety_pixel_click_delay.valueChanged.connect(self._on_safety_changed)
-        self.shared_settings_tab.safety_pixel_poll.valueChanged.connect(self._on_safety_changed)
-        self.shared_settings_tab.safety_cv_prediction.valueChanged.connect(self._on_safety_changed)
-        self.shared_settings_tab.safety_cv_sleep.valueChanged.connect(self._on_safety_changed)
-        self.shared_settings_tab.safety_cv_click_hold.valueChanged.connect(self._on_safety_changed)
-        self.shared_settings_tab.safety_cv_cooldown.valueChanged.connect(self._on_safety_changed)
-        self.shared_settings_tab.safety_cv_eased.stateChanged.connect(self._on_safety_changed)
 
         # Connect component config changed signals
         for section in self.movement_tab.sections.values():
@@ -348,29 +378,38 @@ class MainWindow(QtWidgets.QMainWindow):
                 legacy_game_resolution = deep_get(self.current_profile_data, "components.cv_trigger.game_resolution")
                 if isinstance(legacy_game_resolution, dict):
                     deep_set(app_config, "shared.game_resolution", legacy_game_resolution)
+            if not deep_get(app_config, "shared.display_resolution"):
+                legacy_display_resolution = deep_get(self.current_profile_data, "components.pixel_trigger.display_resolution")
+                if isinstance(legacy_display_resolution, dict):
+                    deep_set(app_config, "shared.display_resolution", legacy_display_resolution)
+            if deep_get(app_config, "shared.game_resolution_stretched") is None:
+                legacy_stretched = deep_get(self.current_profile_data, "components.pixel_trigger.stretched", True)
+                deep_set(app_config, "shared.game_resolution_stretched", bool(legacy_stretched))
+            app_config.pop("safety", None)
+            deep_set(self.current_profile_data, "app", app_config)
             self.shared_settings_tab.load_config(app_config)
             self.movement_tab.load_config(deep_get(self.current_profile_data, "components", {}))
             self.recoil_tab.load_config(deep_get(self.current_profile_data, "components.recoil", {}))
-
-            # Pre-populate pixel trigger config with shared resolution data
-            pixel_trigger_cfg = deep_copy(deep_get(self.current_profile_data, "components.pixel_trigger", {}) or {})
-            shared_cfg = deep_get(self.current_profile_data, "app.shared", {}) or {}
-            if isinstance(shared_cfg, dict):
-                if "game_resolution" not in pixel_trigger_cfg or not pixel_trigger_cfg.get("game_resolution"):
-                    gr = shared_cfg.get("game_resolution", {"width": 1920, "height": 1080})
-                    pixel_trigger_cfg["game_resolution"] = deep_copy(gr) if isinstance(gr, dict) else {"width": 1920, "height": 1080}
-                if "display_resolution" not in pixel_trigger_cfg or not pixel_trigger_cfg.get("display_resolution"):
-                    dr = shared_cfg.get("display_resolution", {"width": 1920, "height": 1080})
-                    pixel_trigger_cfg["display_resolution"] = deep_copy(dr) if isinstance(dr, dict) else {"width": 1920, "height": 1080}
-            self.pixel_trigger_tab.load_config(pixel_trigger_cfg)
+            self._load_pixel_trigger_from_profile()
 
             self.cv_trigger_tab.load_config(deep_get(self.current_profile_data, "components.cv_trigger", {}))
             self.misc_tab.load_config("kill_sound", deep_get(self.current_profile_data, "components.kill_sound", {}))
             self.misc_tab.load_config("bomb_timer", deep_get(self.current_profile_data, "components.bomb_timer", {}))
+            self.misc_tab.load_config("auto_shoot", deep_get(self.current_profile_data, "components.auto_shoot", {}))
             self._movement_hotkey_disabled.clear()
             self._configure_hotkeys()
         finally:
             self._loading_profile = False
+
+    def _load_pixel_trigger_from_profile(self) -> None:
+        pixel_trigger_cfg = deep_get(self.current_profile_data, "components.pixel_trigger", {}) or {}
+        shared_cfg = deep_get(self.current_profile_data, "app.shared", {}) or {}
+        self.pixel_trigger_tab.load_config(
+            _pixel_trigger_config_with_shared_settings(
+                pixel_trigger_cfg if isinstance(pixel_trigger_cfg, dict) else {},
+                shared_cfg if isinstance(shared_cfg, dict) else {},
+            ),
+        )
 
     def save_current_profile(self) -> None:
         self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)
@@ -409,6 +448,8 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 existing = deep_get(self.current_profile_data, f"components.{name}", {})
                 cfg = _deep_merge_preserving_hidden(existing if isinstance(existing, dict) else {}, extracted)
+            if name == "pixel_trigger":
+                cfg = _without_pixel_trigger_shared_keys(cfg)
             deep_set(self.current_profile_data, f"components.{name}", cfg)
 
         # Misc tab returns {kill_sound: …, bomb_timer: …}
@@ -427,16 +468,25 @@ class MainWindow(QtWidgets.QMainWindow):
             merged = deep_copy(config if isinstance(config, dict) else {})
         else:
             merged = _deep_merge_preserving_hidden(existing if isinstance(existing, dict) else {}, config)
+        if component_name == "pixel_trigger":
+            merged = _without_pixel_trigger_shared_keys(merged)
         deep_set(self.current_profile_data, f"components.{component_name}", merged)
         self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)
+        if component_name == "cv_trigger":
+            self.cv_trigger_tab.mark_runtime_waiting()
         self.runtime.restart_component(component_name, self.current_profile_data)
 
     def _on_shared_settings_changed(self) -> None:
         if self._loading_profile:
             return
         self._sync_current_profile_from_widgets()
+        self._loading_profile = True
+        try:
+            self._load_pixel_trigger_from_profile()
+        finally:
+            self._loading_profile = False
         self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)
-        for name in ("bhop", "snap_tap", "counter_strafe", "recoil", "cv_trigger"):
+        for name in ("bhop", "snap_tap", "counter_strafe", "recoil", "pixel_trigger", "cv_trigger"):
             self.runtime.restart_component(name, self.current_profile_data)
 
     def _on_hotkeys_changed(self) -> None:
@@ -445,14 +495,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self._sync_current_profile_from_widgets()
         self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)
         self._configure_hotkeys()
-
-    def _on_safety_changed(self) -> None:
-        if self._loading_profile:
-            return
-        self._sync_current_profile_from_widgets()
-        self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)
-        for name in ("recoil", "pixel_trigger", "cv_trigger"):
-            self.runtime.restart_component(name, self.current_profile_data)
 
     def _configure_hotkeys(self) -> None:
         if self._closing or not hasattr(self, "current_profile_data"):
@@ -551,22 +593,15 @@ class MainWindow(QtWidgets.QMainWindow):
         elif name == "recoil":
             self.recoil_tab.load_config(deep_get(self.current_profile_data, "components.recoil", {}))
         elif name == "pixel_trigger":
-            pt_cfg = deep_copy(deep_get(self.current_profile_data, "components.pixel_trigger", {}) or {})
-            shared_cfg = deep_get(self.current_profile_data, "app.shared", {}) or {}
-            if isinstance(shared_cfg, dict):
-                if not pt_cfg.get("game_resolution"):
-                    gr = shared_cfg.get("game_resolution", {"width": 1920, "height": 1080})
-                    pt_cfg["game_resolution"] = deep_copy(gr) if isinstance(gr, dict) else {"width": 1920, "height": 1080}
-                if not pt_cfg.get("display_resolution"):
-                    dr = shared_cfg.get("display_resolution", {"width": 1920, "height": 1080})
-                    pt_cfg["display_resolution"] = deep_copy(dr) if isinstance(dr, dict) else {"width": 1920, "height": 1080}
-            self.pixel_trigger_tab.load_config(pt_cfg)
+            self._load_pixel_trigger_from_profile()
         elif name == "cv_trigger":
             self.cv_trigger_tab.load_config(deep_get(self.current_profile_data, "components.cv_trigger", {}))
         elif name == "bomb_timer":
             self.misc_tab.load_config("bomb_timer", deep_get(self.current_profile_data, "components.bomb_timer", {}))
         elif name == "kill_sound":
             self.misc_tab.load_config("kill_sound", deep_get(self.current_profile_data, "components.kill_sound", {}))
+        elif name == "auto_shoot":
+            self.misc_tab.load_config("auto_shoot", deep_get(self.current_profile_data, "components.auto_shoot", {}))
         self.runtime.restart_component(name, self.current_profile_data)
         if save:
             self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)

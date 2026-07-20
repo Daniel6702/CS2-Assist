@@ -131,6 +131,7 @@ class CrosshairRenderer:
 
     REFERENCE_HEIGHT: Final[int] = 1080
     _TRIM_PADDING: Final[int] = 1
+    _SCOPE_CROP_RADIUS: Final[int] = 6
 
     def render(
         self,
@@ -303,20 +304,18 @@ class CrosshairRenderer:
         painter.end()
 
         pixel_map = self._image_to_pixel_map(image)
-        # Crop to 5 game-pixels from centre so the grid widget stays small.
-        # For even game dimensions the centre is between two pixels → even crop
-        # (5 on each side = 10).  For odd game dimensions the centre is on a
-        # pixel → odd crop (5 on each side + centre = 11).
         if pixel_map and pixel_map[0]:
             h, w = len(pixel_map), len(pixel_map[0])
             cy, cx = h // 2, w // 2
 
-            def _crop_range(c: int, is_even: bool, limit: int) -> tuple[int, int]:
-                end = c + 5 if is_even else c + 6
-                return max(0, c - 5), min(end, limit)
+            def _scope_crop_range(c: int, limit: int) -> tuple[int, int]:
+                return max(0, c - self._SCOPE_CROP_RADIUS), min(
+                    c + self._SCOPE_CROP_RADIUS,
+                    limit,
+                )
 
-            y_start, y_end = _crop_range(cy, screen_height % 2 == 0, h)
-            x_start, x_end = _crop_range(cx, screen_width % 2 == 0, w)
+            y_start, y_end = _scope_crop_range(cy, h)
+            x_start, x_end = _scope_crop_range(cx, w)
             pixel_map = [row[x_start:x_end] for row in pixel_map[y_start:y_end]]
 
         if not stretch_to_display:
@@ -339,17 +338,18 @@ class CrosshairRenderer:
             stretch_filter=stretch_filter,
         )
         stretched_map = self._image_to_pixel_map(stretched)
-        # Crop stretched map to 5 display-pixels from centre, parity-aware.
         if stretched_map and stretched_map[0]:
             h, w = len(stretched_map), len(stretched_map[0])
             cy, cx = h // 2, w // 2
 
-            def _crop_stretched(c: int, is_even: bool, limit: int) -> tuple[int, int]:
-                end = c + 5 if is_even else c + 6
-                return max(0, c - 5), min(end, limit)
+            def _scope_crop_stretched(c: int, limit: int) -> tuple[int, int]:
+                return max(0, c - self._SCOPE_CROP_RADIUS), min(
+                    c + self._SCOPE_CROP_RADIUS,
+                    limit,
+                )
 
-            y_start, y_end = _crop_stretched(cy, display_height % 2 == 0, h)
-            x_start, x_end = _crop_stretched(cx, display_width % 2 == 0, w)
+            y_start, y_end = _scope_crop_stretched(cy, h)
+            x_start, x_end = _scope_crop_stretched(cx, w)
             stretched_map = [row[x_start:x_end] for row in stretched_map[y_start:y_end]]
         return stretched_map
 

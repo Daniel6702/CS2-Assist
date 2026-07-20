@@ -13,9 +13,10 @@
                 "width": 1600,
                 "height": 1200
             },
+            "game_resolution_stretched": true,
             "display_resolution": {
-                "width": 1920,
-                "height": 1080
+                "width": 2560,
+                "height": 1440
             }
         },
         "hotkeys": {
@@ -25,27 +26,6 @@
             "movement": "F4",
             "stop_all": "F5",
             "overlay": "Insert"
-        },
-        "safety": {
-            "enabled": false,
-            "obscure_device_names": false,
-            "recoil": {
-                "jitter_step_fraction": 0.0,
-                "jitter_noise_mix_fraction": 0.0,
-                "jitter_noise_decay_fraction": 0.0
-            },
-            "pixel_trigger": {
-                "jitter_cooldown_fraction": 0.0,
-                "jitter_click_delay_fraction": 0.0,
-                "jitter_poll_fraction": 0.0
-            },
-            "cv_trigger": {
-                "jitter_prediction_fraction": 0.0,
-                "jitter_sleep_fraction": 0.0,
-                "jitter_click_hold_fraction": 0.0,
-                "jitter_cooldown_fraction": 0.0,
-                "eased_movement_enabled": false
-            }
         }
     },
     "components": {
@@ -156,17 +136,8 @@
             "x": null,
             "y": null,
             "crosshair_code": "CSGO-jpyh8-ZHiJN-c72vq-77pyy-qbOUD",
-            "game_resolution": {
-                "width": 1600,
-                "height": 1200
-            },
-            "display_resolution": {
-                "width": 2560,
-                "height": 1440
-            },
             "monitor_pixel_x": 1279,
             "monitor_pixel_y": 719,
-            "stretched": true,
             "scope_width": 1,
             "scope_monitor_pixel_x": 1278,
             "scope_monitor_pixel_y": 718,
@@ -175,6 +146,215 @@
             "scope_blur_duration_ms": 600
         },
         "cv_trigger": {
+            "enabled": true,
+            "model_path": "./resources/best.pt",
+            "use_gsi_opponent_side": false,
+            "manual_target_side": "both",
+            "inference_confidence": 0.15,
+            "inference_img_size": 512,
+            "jitter_deadzone_px": 2.0,
+            "near_smoothing_alpha": 0.3,
+            "near_smoothing_radius_px": 24.0,
+            "position_smoothing_frames": 3,
+            "anti_oscillation_radius_px": 26.0,
+            "anti_oscillation_reserve_counts": 1,
+            "anti_oscillation_lock_frames": 2,
+            "configs": {
+                "Deagle": {
+                    "enabled": true,
+                    "priority": 0,
+                    "activation": {
+                        "mode": "always"
+                    },
+                    "allowed_weapons": [
+                        "weapon_deagle"
+                    ],
+                    "target_type": "type1",
+                    "only_when_scoped_visual": false,
+                    "auto_shoot": false,
+                    "spray_target_offset_enabled": false,
+                    "AIM_MODE": "head",
+                    "HEAD_OFFSET": 0.1,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "SNAP_DISTANCE": 60,
+                    "SETTLE_FRAMES": 2,
+                    "CLICK_HOLD_MS": 15,
+                    "COOLDOWN_MS": 250,
+                    "auto_shoot_aim_cooldown_ms": 250,
+                    "AIM_STRENGTH": 0.45,
+                    "AIM_CURVE_ID": "pistol",
+                    "MAX_AIM_SPEED_PX": 28,
+                    "SMOOTHING_ALPHA": 0.0,
+                    "NOISE_AMOUNT": 0.0,
+                    "AUTO_SHOOT_ZONE_WIDTH": 28,
+                    "AUTO_SHOOT_ZONE_HEIGHT": 36,
+                    "AUTO_SHOOT_ZONE_Y_POS": 0.35
+                },
+                "Rifle": {
+                    "enabled": true,
+                    "priority": 0,
+                    "activation": {
+                        "mode": "always"
+                    },
+                    "allowed_weapons": [
+                        "weapon_ak47",
+                        "weapon_m4a1",
+                        "weapon_m4a1_silencer",
+                        "weapon_famas",
+                        "weapon_galilar",
+                        "weapon_aug",
+                        "weapon_sg556"
+                    ],
+                    "target_type": "type1",
+                    "only_when_scoped_visual": false,
+                    "auto_shoot": false,
+                    "spray_target_offset_enabled": true,
+                    "AIM_MODE": "body",
+                    "HEAD_OFFSET": 0.1,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "SNAP_DISTANCE": 60,
+                    "SETTLE_FRAMES": 2,
+                    "CLICK_HOLD_MS": 20,
+                    "COOLDOWN_MS": 350,
+                    "auto_shoot_aim_cooldown_ms": 200,
+                    "AIM_STRENGTH": 0.55,
+                    "AIM_CURVE_ID": "rifle",
+                    "MAX_AIM_SPEED_PX": 30,
+                    "SMOOTHING_ALPHA": 0.5,
+                    "NOISE_AMOUNT": 1.0,
+                    "AUTO_SHOOT_ZONE_WIDTH": 28,
+                    "AUTO_SHOOT_ZONE_HEIGHT": 36,
+                    "AUTO_SHOOT_ZONE_Y_POS": 0.35
+                },
+                "Rifle_Shooting": {
+                    "enabled": true,
+                    "priority": 1,
+                    "activation": {
+                        "device": "mouse",
+                        "button": "left"
+                    },
+                    "allowed_weapons": [
+                        "weapon_ak47",
+                        "weapon_m4a1",
+                        "weapon_m4a1_silencer",
+                        "weapon_famas",
+                        "weapon_galilar",
+                        "weapon_aug",
+                        "weapon_sg556"
+                    ],
+                    "target_type": "type1",
+                    "only_when_scoped_visual": false,
+                    "auto_shoot": false,
+                    "spray_target_offset_enabled": true,
+                    "AIM_MODE": "head",
+                    "HEAD_OFFSET": 0.1,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "SNAP_DISTANCE": 100,
+                    "SETTLE_FRAMES": 2,
+                    "CLICK_HOLD_MS": 15,
+                    "COOLDOWN_MS": 250,
+                    "auto_shoot_aim_cooldown_ms": 250,
+                    "AIM_STRENGTH": 0.9,
+                    "AIM_CURVE_ID": "constant_50",
+                    "MAX_AIM_SPEED_PX": 35,
+                    "SMOOTHING_ALPHA": 0.5,
+                    "NOISE_AMOUNT": 1.0,
+                    "AUTO_SHOOT_ZONE_WIDTH": 28,
+                    "AUTO_SHOOT_ZONE_HEIGHT": 36,
+                    "AUTO_SHOOT_ZONE_Y_POS": 0.35
+                },
+                "Scout": {
+                    "enabled": true,
+                    "priority": 0,
+                    "activation": {
+                        "mode": "always"
+                    },
+                    "allowed_weapons": [
+                        "weapon_ssg08"
+                    ],
+                    "target_type": "type1",
+                    "only_when_scoped_visual": true,
+                    "auto_shoot": false,
+                    "spray_target_offset_enabled": false,
+                    "AIM_MODE": "body",
+                    "HEAD_OFFSET": 0.1,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "SNAP_DISTANCE": 70,
+                    "SETTLE_FRAMES": 0,
+                    "CLICK_HOLD_MS": 15,
+                    "COOLDOWN_MS": 2000,
+                    "auto_shoot_aim_cooldown_ms": 200,
+                    "AIM_STRENGTH": 100.0,
+                    "AIM_CURVE_ID": "scout",
+                    "MAX_AIM_SPEED_PX": 1000,
+                    "SMOOTHING_ALPHA": 0.0,
+                    "NOISE_AMOUNT": 0.0,
+                    "AUTO_SHOOT_ZONE_WIDTH": 80,
+                    "AUTO_SHOOT_ZONE_HEIGHT": 110,
+                    "AUTO_SHOOT_ZONE_Y_POS": 0.105
+                },
+                "Trigger": {
+                    "enabled": true,
+                    "priority": 5,
+                    "activation": {
+                        "device": "keyboard",
+                        "key": "alt"
+                    },
+                    "allowed_weapons": [
+                        "weapon_usp_silencer"
+                    ],
+                    "target_type": "type1",
+                    "only_when_scoped_visual": false,
+                    "auto_shoot": true,
+                    "spray_target_offset_enabled": false,
+                    "AIM_MODE": "head",
+                    "HEAD_OFFSET": 0.1,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "SNAP_DISTANCE": 25,
+                    "SETTLE_FRAMES": 0,
+                    "CLICK_HOLD_MS": 15,
+                    "COOLDOWN_MS": 400,
+                    "auto_shoot_aim_cooldown_ms": 200,
+                    "AIM_STRENGTH": 1.5,
+                    "AIM_CURVE_ID": "pistol",
+                    "MAX_AIM_SPEED_PX": 35,
+                    "SMOOTHING_ALPHA": 0.5,
+                    "NOISE_AMOUNT": 0.0,
+                    "AUTO_SHOOT_ZONE_WIDTH": 30,
+                    "AUTO_SHOOT_ZONE_HEIGHT": 50,
+                    "AUTO_SHOOT_ZONE_Y_POS": 0.105
+                },
+                "USP": {
+                    "enabled": true,
+                    "priority": 0,
+                    "activation": {
+                        "mode": "always"
+                    },
+                    "allowed_weapons": [
+                        "weapon_usp_silencer"
+                    ],
+                    "target_type": "type1",
+                    "only_when_scoped_visual": false,
+                    "auto_shoot": false,
+                    "spray_target_offset_enabled": false,
+                    "AIM_MODE": "head",
+                    "HEAD_OFFSET": 0.12,
+                    "BODY_KNEE_OFFSET": 0.5,
+                    "SNAP_DISTANCE": 60,
+                    "SETTLE_FRAMES": 2,
+                    "CLICK_HOLD_MS": 15,
+                    "COOLDOWN_MS": 250,
+                    "auto_shoot_aim_cooldown_ms": 250,
+                    "AIM_STRENGTH": 0.4,
+                    "AIM_CURVE_ID": "pistol",
+                    "MAX_AIM_SPEED_PX": 20,
+                    "SMOOTHING_ALPHA": 0.0,
+                    "NOISE_AMOUNT": 1.0,
+                    "AUTO_SHOOT_ZONE_WIDTH": 28,
+                    "AUTO_SHOOT_ZONE_HEIGHT": 36,
+                    "AUTO_SHOOT_ZONE_Y_POS": 0.35
+                }
+            },
             "aim_curves": {
                 "constant_50": {
                     "label": "Constant 50%",
@@ -322,216 +502,7 @@
                         ]
                     ]
                 }
-            },
-            "anti_oscillation_lock_frames": 2,
-            "anti_oscillation_radius_px": 26.0,
-            "anti_oscillation_reserve_counts": 1,
-            "configs": {
-                "Deagle": {
-                    "AIM_CURVE_ID": "pistol",
-                    "AIM_MODE": "head",
-                    "AIM_STRENGTH": 0.4,
-                    "AUTO_SHOOT_ZONE_HEIGHT": 36,
-                    "AUTO_SHOOT_ZONE_WIDTH": 28,
-                    "AUTO_SHOOT_ZONE_Y_POS": 0.35,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "CLICK_HOLD_MS": 15,
-                    "COOLDOWN_MS": 250,
-                    "HEAD_OFFSET": 0.1,
-                    "MAX_AIM_SPEED_PX": 25,
-                    "NOISE_AMOUNT": 0.0,
-                    "SETTLE_FRAMES": 2,
-                    "SMOOTHING_ALPHA": 0.0,
-                    "SNAP_DISTANCE": 60,
-                    "activation": {
-                        "mode": "always"
-                    },
-                    "allowed_weapons": [
-                        "weapon_deagle"
-                    ],
-                    "auto_shoot": false,
-                    "auto_shoot_aim_cooldown_ms": 250,
-                    "enabled": true,
-                    "only_when_scoped_visual": false,
-                    "priority": 0,
-                    "spray_target_offset_enabled": false,
-                    "target_type": "type1"
-                },
-                "Rifle": {
-                    "AIM_CURVE_ID": "rifle",
-                    "AIM_MODE": "body",
-                    "AIM_STRENGTH": 0.55,
-                    "AUTO_SHOOT_ZONE_HEIGHT": 36,
-                    "AUTO_SHOOT_ZONE_WIDTH": 28,
-                    "AUTO_SHOOT_ZONE_Y_POS": 0.35,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "CLICK_HOLD_MS": 20,
-                    "COOLDOWN_MS": 350,
-                    "HEAD_OFFSET": 0.1,
-                    "MAX_AIM_SPEED_PX": 30,
-                    "NOISE_AMOUNT": 1.0,
-                    "SETTLE_FRAMES": 2,
-                    "SMOOTHING_ALPHA": 0.5,
-                    "SNAP_DISTANCE": 60,
-                    "activation": {
-                        "mode": "always"
-                    },
-                    "allowed_weapons": [
-                        "weapon_ak47",
-                        "weapon_m4a1",
-                        "weapon_m4a1_silencer",
-                        "weapon_famas",
-                        "weapon_galilar",
-                        "weapon_aug",
-                        "weapon_sg556"
-                    ],
-                    "auto_shoot": false,
-                    "auto_shoot_aim_cooldown_ms": 200,
-                    "enabled": true,
-                    "only_when_scoped_visual": false,
-                    "priority": 0,
-                    "spray_target_offset_enabled": true,
-                    "target_type": "type1"
-                },
-                "Rifle_Shooting": {
-                    "AIM_CURVE_ID": "constant_50",
-                    "AIM_MODE": "head",
-                    "AIM_STRENGTH": 0.9,
-                    "AUTO_SHOOT_ZONE_HEIGHT": 36,
-                    "AUTO_SHOOT_ZONE_WIDTH": 28,
-                    "AUTO_SHOOT_ZONE_Y_POS": 0.35,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "CLICK_HOLD_MS": 15,
-                    "COOLDOWN_MS": 250,
-                    "HEAD_OFFSET": 0.1,
-                    "MAX_AIM_SPEED_PX": 35,
-                    "NOISE_AMOUNT": 1.0,
-                    "SETTLE_FRAMES": 2,
-                    "SMOOTHING_ALPHA": 0.5,
-                    "SNAP_DISTANCE": 100,
-                    "activation": {
-                        "button": "left",
-                        "device": "mouse"
-                    },
-                    "allowed_weapons": [
-                        "weapon_ak47",
-                        "weapon_m4a1",
-                        "weapon_m4a1_silencer",
-                        "weapon_famas",
-                        "weapon_galilar",
-                        "weapon_aug",
-                        "weapon_sg556"
-                    ],
-                    "auto_shoot": false,
-                    "auto_shoot_aim_cooldown_ms": 250,
-                    "enabled": true,
-                    "only_when_scoped_visual": false,
-                    "priority": 1,
-                    "spray_target_offset_enabled": true,
-                    "target_type": "type1"
-                },
-                "Scout": {
-                    "AIM_CURVE_ID": "scout",
-                    "AIM_MODE": "head",
-                    "AIM_STRENGTH": 100.0,
-                    "AUTO_SHOOT_ZONE_HEIGHT": 110,
-                    "AUTO_SHOOT_ZONE_WIDTH": 80,
-                    "AUTO_SHOOT_ZONE_Y_POS": 0.105,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "CLICK_HOLD_MS": 15,
-                    "COOLDOWN_MS": 1800,
-                    "HEAD_OFFSET": 0.1,
-                    "MAX_AIM_SPEED_PX": 1000,
-                    "NOISE_AMOUNT": 0.0,
-                    "SETTLE_FRAMES": 0,
-                    "SMOOTHING_ALPHA": 0.0,
-                    "SNAP_DISTANCE": 70,
-                    "activation": {
-                        "mode": "always"
-                    },
-                    "allowed_weapons": [
-                        "weapon_ssg08"
-                    ],
-                    "auto_shoot": true,
-                    "auto_shoot_aim_cooldown_ms": 200,
-                    "enabled": true,
-                    "only_when_scoped_visual": true,
-                    "priority": 0,
-                    "spray_target_offset_enabled": false,
-                    "target_type": "type1"
-                },
-                "Trigger": {
-                    "AIM_CURVE_ID": "pistol",
-                    "AIM_MODE": "head",
-                    "AIM_STRENGTH": 1.5,
-                    "AUTO_SHOOT_ZONE_HEIGHT": 50,
-                    "AUTO_SHOOT_ZONE_WIDTH": 30,
-                    "AUTO_SHOOT_ZONE_Y_POS": 0.105,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "CLICK_HOLD_MS": 15,
-                    "COOLDOWN_MS": 400,
-                    "HEAD_OFFSET": 0.1,
-                    "MAX_AIM_SPEED_PX": 35,
-                    "NOISE_AMOUNT": 0.0,
-                    "SETTLE_FRAMES": 0,
-                    "SMOOTHING_ALPHA": 0.5,
-                    "SNAP_DISTANCE": 25,
-                    "activation": {
-                        "device": "keyboard",
-                        "key": "alt"
-                    },
-                    "allowed_weapons": [
-                        "weapon_usp_silencer"
-                    ],
-                    "auto_shoot": true,
-                    "auto_shoot_aim_cooldown_ms": 200,
-                    "enabled": true,
-                    "only_when_scoped_visual": false,
-                    "priority": 5,
-                    "spray_target_offset_enabled": false,
-                    "target_type": "type1"
-                },
-                "USP": {
-                    "AIM_CURVE_ID": "pistol",
-                    "AIM_MODE": "head",
-                    "AIM_STRENGTH": 0.4,
-                    "AUTO_SHOOT_ZONE_HEIGHT": 36,
-                    "AUTO_SHOOT_ZONE_WIDTH": 28,
-                    "AUTO_SHOOT_ZONE_Y_POS": 0.35,
-                    "BODY_KNEE_OFFSET": 0.5,
-                    "CLICK_HOLD_MS": 15,
-                    "COOLDOWN_MS": 250,
-                    "HEAD_OFFSET": 0.12,
-                    "MAX_AIM_SPEED_PX": 20,
-                    "NOISE_AMOUNT": 1.0,
-                    "SETTLE_FRAMES": 2,
-                    "SMOOTHING_ALPHA": 0.0,
-                    "SNAP_DISTANCE": 60,
-                    "activation": {
-                        "mode": "always"
-                    },
-                    "allowed_weapons": [
-                        "weapon_usp_silencer"
-                    ],
-                    "auto_shoot": false,
-                    "auto_shoot_aim_cooldown_ms": 250,
-                    "enabled": true,
-                    "only_when_scoped_visual": false,
-                    "priority": 0,
-                    "spray_target_offset_enabled": false,
-                    "target_type": "type1"
-                }
-            },
-            "enabled": true,
-            "inference_confidence": 0.15,
-            "inference_img_size": 512,
-            "jitter_deadzone_px": 2.0,
-            "manual_target_side": "both",
-            "model_path": "./resources/best.pt",
-            "near_smoothing_alpha": 0.35,
-            "near_smoothing_radius_px": 32.0,
-            "position_smoothing_frames": 3,
-            "use_gsi_opponent_side": true
+            }
         },
         "kill_sound": {
             "enabled": true,
@@ -550,6 +521,12 @@
             "warning_5s_volume": 50,
             "defuse_warning_enabled": true,
             "timer_seconds": 40
+        },
+        "auto_shoot": {
+            "enabled": true,
+            "clicks_per_second": 30.0,
+            "click_hold_ms": 20,
+            "allowed_weapon_file": "./resources/weapon_codes.txt"
         }
     }
 }

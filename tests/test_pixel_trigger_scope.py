@@ -24,6 +24,39 @@ from app.ui.tabs.pixel_trigger_tab import PixelTriggerTab  # noqa: E402
 
 
 class PixelTriggerScopeTests(unittest.TestCase):
+    def test_pixel_trigger_tab_uses_one_to_three_page_split(self) -> None:
+        tab = PixelTriggerTab(DeviceService())
+        scroll = tab.findChild(QtWidgets.QScrollArea)
+        self.assertIsNotNone(scroll)
+
+        content = scroll.widget()
+        columns = content.layout()
+
+        self.assertEqual(columns.stretch(0), 1)
+        self.assertEqual(columns.stretch(1), 3)
+
+    def test_crosshair_code_toolbar_has_no_copy_button(self) -> None:
+        tab = PixelTriggerTab(DeviceService())
+
+        button_labels = {button.text() for button in tab.findChildren(QtWidgets.QPushButton)}
+
+        self.assertNotIn("Copy", button_labels)
+
+    def test_base_and_scope_pixel_selectors_are_side_by_side(self) -> None:
+        tab = PixelTriggerTab(DeviceService())
+        selection_row = tab.findChild(QtWidgets.QWidget, "pixel_selection_row")
+        self.assertIsNotNone(selection_row)
+
+        layout = selection_row.layout()
+
+        self.assertIsInstance(layout, QtWidgets.QHBoxLayout)
+        self.assertEqual(layout.count(), 2)
+
+    def test_sniper_scope_grid_is_twelve_by_twelve(self) -> None:
+        tab = PixelTriggerTab(DeviceService())
+
+        self.assertEqual(tab._scope_grid.image_dimensions(), (12, 12))
+
     def test_scope_state_selects_scope_pixel_coordinates(self) -> None:
         selection = PixelMonitorSelection(
             origin=MonitorOrigin(left=100, top=200),
@@ -86,6 +119,24 @@ class PixelTriggerScopeTests(unittest.TestCase):
         self.assertEqual(extracted["scope_blur_offset_x"], -6)
         self.assertEqual(extracted["scope_blur_offset_y"], -8)
         self.assertEqual(extracted["scope_blur_duration_ms"], 150)
+
+    def test_resolution_settings_are_loaded_but_not_extracted(self) -> None:
+        tab = PixelTriggerTab(DeviceService())
+        tab.load_config(
+            {
+                "game_resolution": {"width": 1600, "height": 1200},
+                "display_resolution": {"width": 2560, "height": 1440},
+                "game_resolution_stretched": True,
+            },
+        )
+
+        extracted = tab.extract_config()
+
+        self.assertEqual(tab._target_frame_dimensions(), (2560, 1440))
+        self.assertNotIn("game_resolution", extracted)
+        self.assertNotIn("display_resolution", extracted)
+        self.assertNotIn("stretched", extracted)
+        self.assertNotIn("game_resolution_stretched", extracted)
 
 
 if __name__ == "__main__":

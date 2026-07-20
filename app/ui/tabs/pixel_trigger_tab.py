@@ -69,6 +69,9 @@ class PixelTriggerTab(BaseTab):
         self._updating_controls = False
         self._current_pixel_map: PixelMapT = []
         self._stored_monitor_pixel: tuple[int, int] | None = None
+        self._game_resolution = (1920, 1080)
+        self._display_resolution = (1920, 1080)
+        self._game_resolution_stretched = True
 
         # Scope crosshair state
         self._scope_width = 1
@@ -135,27 +138,25 @@ class PixelTriggerTab(BaseTab):
         right_layout.setSpacing(6)
 
         self._build_toolbar(right_layout)
-        self._build_grid(right_layout)
 
-        self._pixel_info_label = QtWidgets.QLabel("No pixel selected")
-        self._pixel_info_label.setWordWrap(True)
-        self._pixel_info_label.setStyleSheet("color: #444; font-size: 11px;")
-        right_layout.addWidget(self._pixel_info_label)
+        hint = QtWidgets.QLabel(
+            "Choose a pixel to be monitored for color change — "
+            "Should not be covered by your crosshair of course",
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #666; font-size: 11px; padding-bottom: 2px;")
+        right_layout.addWidget(hint)
 
-        self._screen_coord_label = QtWidgets.QLabel("")
-        self._screen_coord_label.setStyleSheet("color: #666; font-size: 11px;")
-        right_layout.addWidget(self._screen_coord_label)
-
-        # ── Sniper Scope section ──────────────────────────────────────────
-        sep = QtWidgets.QFrame()
-        sep.setFrameShape(QtWidgets.QFrame.HLine)
-        sep.setFrameShadow(QtWidgets.QFrame.Sunken)
-        sep.setStyleSheet("color: #ccc;")
-        right_layout.addWidget(sep)
-
-        self._build_scope_grid(right_layout)
-
-        self._build_resolution_panel(right_layout)
+        selection_row = QtWidgets.QWidget()
+        selection_row.setObjectName("pixel_selection_row")
+        selection_layout = QtWidgets.QGridLayout(selection_row)
+        selection_layout.setContentsMargins(0, 0, 0, 0)
+        selection_layout.setSpacing(12)
+        selection_layout.setColumnStretch(0, 1)
+        selection_layout.setColumnStretch(1, 1)
+        self._build_grid(selection_layout, 0)
+        self._build_scope_grid(selection_layout, 1)
+        right_layout.addWidget(selection_row, 1)
 
         ch_advanced = CollapsibleBox("Advanced")
         self._build_crosshair_settings(ch_advanced.content_layout)
@@ -163,7 +164,7 @@ class PixelTriggerTab(BaseTab):
 
         right_wrapper.addWidget(right_group)
         right_wrapper.addStretch(1)
-        columns.addLayout(right_wrapper, 2)
+        columns.addLayout(right_wrapper, 3)
 
         scroll.setWidget(content)
         main_layout.addWidget(scroll)
@@ -183,10 +184,6 @@ class PixelTriggerTab(BaseTab):
         parse_btn = QtWidgets.QPushButton("Parse")
         parse_btn.clicked.connect(self._parse_code)
         code_row.addWidget(parse_btn)
-
-        copy_btn = QtWidgets.QPushButton("Copy")
-        copy_btn.clicked.connect(self._copy_code)
-        code_row.addWidget(copy_btn)
 
         parent_layout.addLayout(code_row)
 
@@ -215,18 +212,10 @@ class PixelTriggerTab(BaseTab):
 
         parent_layout.addLayout(action_row)
 
-    def _build_grid(self, parent_layout: QtWidgets.QVBoxLayout) -> None:
+    def _build_grid(self, parent_layout: QtWidgets.QGridLayout, column: int) -> None:
         base_header = QtWidgets.QLabel("Base Crosshair")
         base_header.setStyleSheet("font-weight: bold; color: #444; padding-top: 2px;")
-        parent_layout.addWidget(base_header)
-
-        hint = QtWidgets.QLabel(
-            "Choose a pixel to be monitored for color change — "
-            "Should not be covered by your crosshair of course",
-        )
-        hint.setWordWrap(True)
-        hint.setStyleSheet("color: #666; font-size: 11px; padding-bottom: 2px;")
-        parent_layout.addWidget(hint)
+        parent_layout.addWidget(base_header, 0, column)
 
         self._grid = PixelGridWidget()
         self._grid.pixel_selected.connect(self._on_pixel_selected)
@@ -236,32 +225,22 @@ class PixelTriggerTab(BaseTab):
         self._scroll_area.setWidgetResizable(False)
         self._scroll_area.setWidget(self._grid)
         self._scroll_area.setFrameShape(QtWidgets.QScrollArea.Shape.StyledPanel)
-        self._scroll_area.setMinimumHeight(200)
-        self._scroll_area.setMaximumHeight(560)
-        parent_layout.addWidget(self._scroll_area, 1)
+        self._scroll_area.setFixedHeight(200)
+        parent_layout.addWidget(self._scroll_area, 1, column)
 
-    def _build_scope_grid(self, parent_layout: QtWidgets.QVBoxLayout) -> None:
+        self._pixel_info_label = QtWidgets.QLabel("No pixel selected")
+        self._pixel_info_label.setWordWrap(True)
+        self._pixel_info_label.setStyleSheet("color: #444; font-size: 11px;")
+        parent_layout.addWidget(self._pixel_info_label, 2, column)
+
+        self._screen_coord_label = QtWidgets.QLabel("")
+        self._screen_coord_label.setStyleSheet("color: #666; font-size: 11px;")
+        parent_layout.addWidget(self._screen_coord_label, 3, column)
+
+    def _build_scope_grid(self, parent_layout: QtWidgets.QGridLayout, column: int) -> None:
         scope_header = QtWidgets.QLabel("Sniper Scope Crosshair")
         scope_header.setStyleSheet("font-weight: bold; color: #444; padding-top: 2px;")
-        parent_layout.addWidget(scope_header)
-
-        width_row = QtWidgets.QHBoxLayout()
-        width_row.addWidget(QtWidgets.QLabel("Scope width:"))
-        self._scope_width_spin = QtWidgets.QSpinBox()
-        self._scope_width_spin.setRange(1, 6)
-        self._scope_width_spin.setValue(1)
-        self._scope_width_spin.valueChanged.connect(self._on_scope_width_changed)
-        width_row.addWidget(self._scope_width_spin)
-        width_row.addStretch()
-        parent_layout.addLayout(width_row)
-
-        scope_hint = QtWidgets.QLabel(
-            "Select a pixel to monitor while scoped. "
-            "Pick one not covered by the black scope crosshair.",
-        )
-        scope_hint.setWordWrap(True)
-        scope_hint.setStyleSheet("color: #666; font-size: 11px; padding-bottom: 2px;")
-        parent_layout.addWidget(scope_hint)
+        parent_layout.addWidget(scope_header, 0, column)
 
         self._scope_grid = PixelGridWidget()
         self._scope_grid.pixel_selected.connect(self._on_scope_pixel_selected)
@@ -271,64 +250,27 @@ class PixelTriggerTab(BaseTab):
         self._scope_scroll_area.setWidgetResizable(False)
         self._scope_scroll_area.setWidget(self._scope_grid)
         self._scope_scroll_area.setFrameShape(QtWidgets.QScrollArea.Shape.StyledPanel)
-        self._scope_scroll_area.setMinimumHeight(200)
-        self._scope_scroll_area.setMaximumHeight(560)
-        parent_layout.addWidget(self._scope_scroll_area, 1)
+        self._scope_scroll_area.setFixedHeight(200)
+        parent_layout.addWidget(self._scope_scroll_area, 1, column)
 
         self._scope_pixel_info_label = QtWidgets.QLabel("No scope pixel selected")
         self._scope_pixel_info_label.setWordWrap(True)
         self._scope_pixel_info_label.setStyleSheet("color: #444; font-size: 11px;")
-        parent_layout.addWidget(self._scope_pixel_info_label)
+        parent_layout.addWidget(self._scope_pixel_info_label, 2, column)
 
         self._scope_screen_coord_label = QtWidgets.QLabel("")
         self._scope_screen_coord_label.setStyleSheet("color: #666; font-size: 11px;")
-        parent_layout.addWidget(self._scope_screen_coord_label)
+        parent_layout.addWidget(self._scope_screen_coord_label, 3, column)
 
-    def _build_resolution_panel(self, parent_layout: QtWidgets.QVBoxLayout) -> None:
-        game_row = QtWidgets.QHBoxLayout()
-        game_row.addWidget(QtWidgets.QLabel("Game Resolution:"))
-        self._res_w = QtWidgets.QSpinBox()
-        self._res_w.setRange(640, 7680)
-        self._res_w.setValue(1920)
-        self._res_w.setSingleStep(10)
-        self._res_w.valueChanged.connect(self._on_resolution_changed)
-        game_row.addWidget(self._res_w)
-        game_row.addWidget(QtWidgets.QLabel("\u00d7"))
-        self._res_h = QtWidgets.QSpinBox()
-        self._res_h.setRange(480, 4320)
-        self._res_h.setValue(1080)
-        self._res_h.setSingleStep(10)
-        self._res_h.valueChanged.connect(self._on_resolution_changed)
-        game_row.addWidget(self._res_h)
-
-        game_row.addSpacing(12)
-        self._stretch_checkbox = QtWidgets.QCheckBox("Stretched")
-        self._stretch_checkbox.setToolTip(
-            "Stretches the game framebuffer to the display resolution "
-            "using linear filtering (display-like). Unchecked shows native 1:1 pixels.",
-        )
-        self._stretch_checkbox.toggled.connect(self._render_and_display)
-        game_row.addWidget(self._stretch_checkbox)
-        game_row.addStretch()
-        parent_layout.addLayout(game_row)
-
-        display_row = QtWidgets.QHBoxLayout()
-        display_row.addWidget(QtWidgets.QLabel("Display Resolution:"))
-        self._display_w = QtWidgets.QSpinBox()
-        self._display_w.setRange(640, 7680)
-        self._display_w.setValue(1920)
-        self._display_w.setSingleStep(10)
-        self._display_w.valueChanged.connect(self._on_resolution_changed)
-        display_row.addWidget(self._display_w)
-        display_row.addWidget(QtWidgets.QLabel("\u00d7"))
-        self._display_h = QtWidgets.QSpinBox()
-        self._display_h.setRange(480, 4320)
-        self._display_h.setValue(1080)
-        self._display_h.setSingleStep(10)
-        self._display_h.valueChanged.connect(self._on_resolution_changed)
-        display_row.addWidget(self._display_h)
-        display_row.addStretch()
-        parent_layout.addLayout(display_row)
+        width_row = QtWidgets.QHBoxLayout()
+        width_row.addWidget(QtWidgets.QLabel("Scope width:"))
+        self._scope_width_spin = QtWidgets.QSpinBox()
+        self._scope_width_spin.setRange(1, 6)
+        self._scope_width_spin.setValue(1)
+        self._scope_width_spin.valueChanged.connect(self._on_scope_width_changed)
+        width_row.addWidget(self._scope_width_spin)
+        width_row.addStretch()
+        parent_layout.addLayout(width_row, 4, column)
 
     def _build_component_settings(self, parent_layout: QtWidgets.QVBoxLayout) -> None:
         form = QtWidgets.QFormLayout()
@@ -509,9 +451,17 @@ class PixelTriggerTab(BaseTab):
 
     # ── crosshair actions ───────────────────────────────────────────────
 
-    def _on_resolution_changed(self, _value: int = 0) -> None:
-        self._render_and_display()
-        self._select_closest_empty_scope_pixel()
+    @staticmethod
+    def _resolution_from_config(
+        value: Any,
+        default: tuple[int, int],
+        minimum: tuple[int, int],
+    ) -> tuple[int, int]:
+        if not isinstance(value, dict):
+            return default
+        width = max(minimum[0], int(value.get("width", default[0]) or default[0]))
+        height = max(minimum[1], int(value.get("height", default[1]) or default[1]))
+        return width, height
 
     def _parse_code(self) -> None:
         code = self._code_input.text().strip()
@@ -573,18 +523,16 @@ class PixelTriggerTab(BaseTab):
             self._emit_config_changed()
 
     def _render_and_display(self, _value: int | float | bool = 0) -> None:
-        screen_width = self._res_w.value()
-        screen_height = self._res_h.value()
-        stretch_enabled = self._stretch_checkbox.isChecked()
+        screen_width, screen_height = self._game_resolution
 
         stretch_kw: dict[str, Any] = (
             {
                 "stretch_to_display": True,
-                "display_width": self._display_w.value(),
-                "display_height": self._display_h.value(),
+                "display_width": self._display_resolution[0],
+                "display_height": self._display_resolution[1],
                 "stretch_filter": "linear",
             }
-            if stretch_enabled
+            if self._game_resolution_stretched
             else {"stretch_to_display": False}
         )
 
@@ -850,9 +798,9 @@ class PixelTriggerTab(BaseTab):
         return int(screen_x), int(screen_y)
 
     def _target_frame_dimensions(self) -> tuple[int, int]:
-        if self._stretch_checkbox.isChecked():
-            return self._display_w.value(), self._display_h.value()
-        return self._res_w.value(), self._res_h.value()
+        if self._game_resolution_stretched:
+            return self._display_resolution
+        return self._game_resolution
 
     @staticmethod
     def _format_coordinate(value: int | float | bool) -> str:
@@ -880,17 +828,19 @@ class PixelTriggerTab(BaseTab):
                 self._settings = dict(parsed)
                 self._sync_controls_from_settings()
 
-        game_res = config.get("game_resolution", {"width": 1920, "height": 1080})
-        if isinstance(game_res, dict):
-            self._res_w.setValue(max(640, int(game_res.get("width", 1920))))
-            self._res_h.setValue(max(480, int(game_res.get("height", 1080))))
-
-        display_res = config.get("display_resolution", {"width": 1920, "height": 1080})
-        if isinstance(display_res, dict):
-            self._display_w.setValue(max(640, int(display_res.get("width", 1920))))
-            self._display_h.setValue(max(480, int(display_res.get("height", 1080))))
-
-        self._stretch_checkbox.setChecked(bool(config.get("stretched", True)))
+        self._game_resolution = self._resolution_from_config(
+            config.get("game_resolution"),
+            (1920, 1080),
+            (640, 480),
+        )
+        self._display_resolution = self._resolution_from_config(
+            config.get("display_resolution"),
+            (1920, 1080),
+            (640, 480),
+        )
+        self._game_resolution_stretched = bool(
+            config.get("game_resolution_stretched", config.get("stretched", True)),
+        )
 
         self._enabled_cb.setChecked(bool(config.get("enabled", False)))
         self._hold_key.setText(str(config.get("hold_key_name", "shift")))
@@ -953,15 +903,6 @@ class PixelTriggerTab(BaseTab):
             "poll_interval": self._poll_interval.value(),
             "monitor_index": self._monitor_index.value(),
             "crosshair_code": self._codec.generate_code(self._settings),
-            "game_resolution": {
-                "width": self._res_w.value(),
-                "height": self._res_h.value(),
-            },
-            "display_resolution": {
-                "width": self._display_w.value(),
-                "height": self._display_h.value(),
-            },
-            "stretched": self._stretch_checkbox.isChecked(),
             "scope_width": self._scope_width_spin.value(),
             "scope_blur_offset_x": self._scope_blur_offset_x.value(),
             "scope_blur_offset_y": self._scope_blur_offset_y.value(),

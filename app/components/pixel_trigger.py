@@ -12,7 +12,6 @@ from pynput import keyboard, mouse
 
 from app.components.base import BaseComponent
 from app.components.cv_trigger.detection import ScopeDetector
-from app.utils.input_safety import humanize_jitter, humanize_sleep
 
 if TYPE_CHECKING:
     import numpy as np
@@ -304,11 +303,9 @@ class PixelTriggerComponent(BaseComponent):
             scope_blur_duration_ms=max(0, 0 if raw_scope_blur_ms in (None, "") else int(raw_scope_blur_ms)),
         )
 
-        _sf = dict(self._config.get("_safety", {}))
-        _enabled = bool(_sf.get("enabled", False))
-        _cooldown_frac = float(_sf.get("jitter_cooldown_fraction", 0.0))
-        _click_delay_frac = float(_sf.get("jitter_click_delay_fraction", 0.0))
-        _poll_frac = float(_sf.get("jitter_poll_fraction", 0.0))
+        poll_interval = max(0.0005, cfg.poll_interval) if cfg.poll_interval > 0 else cfg.poll_interval
+        cooldown = max(0.02, cfg.cooldown) if cfg.cooldown > 0 else cfg.cooldown
+        click_delay = max(0.01, cfg.click_delay) if cfg.click_delay > 0 else cfg.click_delay
 
         held_keys = set()
         mouse_controller = mouse.Controller()
@@ -418,38 +415,32 @@ class PixelTriggerComponent(BaseComponent):
                         if abs_x != prev_abs_x or abs_y != prev_abs_y:
                             prev_abs_x, prev_abs_y = abs_x, abs_y
                             previous_color = read_single_pixel(sct, abs_x, abs_y, monitor)
-                            humanize_sleep(cfg.poll_interval, fraction=_poll_frac if _enabled else 0.0, min_val=0.0005)
+                            time.sleep(poll_interval)
                             continue
                         current_color = read_single_pixel(sct, abs_x, abs_y, monitor)
                         key_is_held = hold_key in held_keys
 
                         dist = color_distance(previous_color, current_color)
-                        jittered_cooldown = humanize_jitter(
-                            cfg.cooldown, fraction=_cooldown_frac if _enabled else 0.0, min_val=0.02,
-                        )
-
                         if not self.automation_permitted() or not key_is_held:
                             pending_click = False
                             previous_color = current_color
-                            humanize_sleep(cfg.poll_interval, fraction=_poll_frac if _enabled else 0.0, min_val=0.0005)
+                            time.sleep(poll_interval)
                             continue
 
                         if pending_click:
-                            if now >= pending_click_time and now - last_click_time >= jittered_cooldown:
+                            if now >= pending_click_time and now - last_click_time >= cooldown:
                                 mouse_controller.click(mouse.Button.left)
                                 last_click_time = now
                                 pending_click = False
                                 previous_color = current_color
-                            humanize_sleep(cfg.poll_interval, fraction=_poll_frac if _enabled else 0.0, min_val=0.0005)
+                            time.sleep(poll_interval)
                             continue
 
-                        if now - last_click_time >= jittered_cooldown and dist >= cfg.threshold:
+                        if now - last_click_time >= cooldown and dist >= cfg.threshold:
                             pending_click = True
-                            pending_click_time = now + humanize_jitter(
-                                cfg.click_delay, fraction=_click_delay_frac if _enabled else 0.0, min_val=0.01,
-                            )
+                            pending_click_time = now + click_delay
 
-                        humanize_sleep(cfg.poll_interval, fraction=_poll_frac if _enabled else 0.0, min_val=0.0005)
+                        time.sleep(poll_interval)
 
                 else:
                     # ── Legacy multi-point monitoring mode ──
@@ -472,26 +463,22 @@ class PixelTriggerComponent(BaseComponent):
                             for name in previous_colors
                         }
 
-                        jittered_cooldown = humanize_jitter(
-                            cfg.cooldown, fraction=_cooldown_frac if _enabled else 0.0, min_val=0.02,
-                        )
-
                         if not self.automation_permitted() or not key_is_held:
                             pending_click = False
                             previous_colors = current_colors
-                            humanize_sleep(cfg.poll_interval, fraction=_poll_frac if _enabled else 0.0, min_val=0.0005)
+                            time.sleep(poll_interval)
                             continue
 
                         if pending_click:
-                            if now >= pending_click_time and now - last_click_time >= jittered_cooldown:
+                            if now >= pending_click_time and now - last_click_time >= cooldown:
                                 mouse_controller.click(mouse.Button.left)
                                 last_click_time = now
                                 pending_click = False
                                 previous_colors = current_colors
-                            humanize_sleep(cfg.poll_interval, fraction=_poll_frac if _enabled else 0.0, min_val=0.0005)
+                            time.sleep(poll_interval)
                             continue
 
-                        if now - last_click_time >= jittered_cooldown:
+                        if now - last_click_time >= cooldown:
                             changed_points = []
                             for point in points:
                                 name = point["name"]
@@ -501,11 +488,9 @@ class PixelTriggerComponent(BaseComponent):
 
                             if changed_points:
                                 pending_click = True
-                                pending_click_time = now + humanize_jitter(
-                                    cfg.click_delay, fraction=_click_delay_frac if _enabled else 0.0, min_val=0.01,
-                                )
+                                pending_click_time = now + click_delay
 
-                        humanize_sleep(cfg.poll_interval, fraction=_poll_frac if _enabled else 0.0, min_val=0.0005)
+                        time.sleep(poll_interval)
         except Exception as exc:
             self.status(str(exc), "error")
         finally:

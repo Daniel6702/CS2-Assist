@@ -24,6 +24,7 @@ def default_profile() -> dict[str, Any]:
                 "keyboard_device_path": "",
                 "game_sensitivity": 1.0,
                 "game_resolution": {"width": 1600, "height": 1200},
+                "game_resolution_stretched": True,
             },
             "hotkeys": {
                 "cv_trigger": "F1",
@@ -32,27 +33,6 @@ def default_profile() -> dict[str, Any]:
                 "movement": "F4",
                 "stop_all": "F5",
                 "overlay": "Insert",
-            },
-            "safety": {
-                "enabled": False,
-                "obscure_device_names": False,
-                "recoil": {
-                    "jitter_step_fraction": 0.0,
-                    "jitter_noise_mix_fraction": 0.0,
-                    "jitter_noise_decay_fraction": 0.0,
-                },
-                "pixel_trigger": {
-                    "jitter_cooldown_fraction": 0.0,
-                    "jitter_click_delay_fraction": 0.0,
-                    "jitter_poll_fraction": 0.0,
-                },
-                "cv_trigger": {
-                    "jitter_prediction_fraction": 0.0,
-                    "jitter_sleep_fraction": 0.0,
-                    "jitter_click_hold_fraction": 0.0,
-                    "jitter_cooldown_fraction": 0.0,
-                    "eased_movement_enabled": False,
-                },
             },
         },
         "components": {
@@ -132,6 +112,12 @@ def default_profile() -> dict[str, Any]:
                 "warning_5s_enabled": True,
                 "warning_5s_file": "",
                 "warning_5s_volume": 50,
+            },
+            "auto_shoot": {
+                "enabled": False,
+                "clicks_per_second": 8.0,
+                "click_hold_ms": 20,
+                "allowed_weapon_file": "./resources/weapon_codes.txt",
             },
             "cv_trigger": {
                 "enabled": False,

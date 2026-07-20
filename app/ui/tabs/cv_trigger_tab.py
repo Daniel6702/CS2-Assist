@@ -45,3 +45,6 @@ class CVTriggerTab(BaseTab):
 
     def set_runtime_status(self, message: str) -> None:
         self.editor.set_runtime_status(message)
+
+    def mark_runtime_waiting(self) -> None:
+        self.editor.mark_runtime_waiting()

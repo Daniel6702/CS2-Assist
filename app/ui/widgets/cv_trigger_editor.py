@@ -69,6 +69,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         self.component_name = component_name
         self.device_service = device_service
         self._suspend = False
+        self._runtime_waiting = False
         self.rule_editors: list[CVRuleEditor] = []
 
         outer = QtWidgets.QVBoxLayout(self)
@@ -100,7 +101,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         self.enabled.stateChanged.connect(self._emit_change)
         status_layout.addRow("Enabled", self.enabled)
 
-        self.runtime_status = QtWidgets.QLabel("Runtime: idle")
+        self.runtime_status = QtWidgets.QLabel("Runtime: Stopped")
         self.runtime_status.setStyleSheet("color: #888; font-size: 11px;")
         status_layout.addRow("Runtime", self.runtime_status)
 
@@ -261,8 +262,37 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         self.manual_target_side.setVisible(manual_visible)
         self.manual_target_side_label.setVisible(manual_visible)
 
+    def mark_runtime_waiting(self) -> None:
+        if not self.enabled.isChecked():
+            self._runtime_waiting = False
+            self.runtime_status.setText("Runtime: Stopped")
+            return
+        self._runtime_waiting = True
+        self.runtime_status.setText("Runtime: Waiting")
+
     def set_runtime_status(self, message: str) -> None:
-        self.runtime_status.setText(f"Runtime status: {message}")
+        if not self.enabled.isChecked():
+            self._runtime_waiting = False
+            self.runtime_status.setText("Runtime: Stopped")
+            return
+
+        normalized = message.strip().lower()
+        if normalized in {"started", "started.", "running", "active"}:
+            self._runtime_waiting = False
+            self.runtime_status.setText("Runtime: Active")
+            return
+        if (
+            normalized in {"stopped", "stopped.", "idle"}
+            or "not found" in normalized
+            or "failed" in normalized
+        ):
+            self._runtime_waiting = False
+            self.runtime_status.setText("Runtime: Stopped")
+            return
+        if normalized in {"stopping", "stopping."} or self._runtime_waiting:
+            self.runtime_status.setText("Runtime: Waiting")
+            return
+        self.runtime_status.setText("Runtime: Active")
 
     def refresh_devices(self) -> None:
         return
@@ -320,6 +350,10 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
             self._update_target_side_visibility()
         finally:
             self._suspend = False
+        self._runtime_waiting = False
+        self.runtime_status.setText(
+            "Runtime: Active" if self.enabled.isChecked() else "Runtime: Stopped",
+        )
 
     def extract_config(self) -> dict[str, Any]:
         config: dict[str, Any] = {
@@ -417,6 +451,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
     def _emit_change(self, *args) -> None:
         if self._suspend:
             return
+        self.mark_runtime_waiting()
         try:
             cfg = self.extract_config()
         except Exception:

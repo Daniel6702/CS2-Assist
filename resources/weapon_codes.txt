@@ -1,0 +1,12 @@
+weapon_deagle
+weapon_tec9
+weapon_p250
+weapon_ssg08
+weapon_hkp2000
+weapon_glock
+weapon_awp
+weapon_sawedoff
+weapon_nova
+weapon_fiveseven
+weapon_usp_silencer
+weapon_elite
