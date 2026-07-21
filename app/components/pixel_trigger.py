@@ -11,13 +11,16 @@ from mss import mss
 from pynput import keyboard, mouse
 
 from app.components.base import BaseComponent
-from app.components.cv_trigger.detection import ScopeDetector
+from app.components.cv_trigger.activation import canonical_weapon_name
+from app.components.cv_trigger.detection import ScopeDetector, scope_corner_capture_regions
 
 if TYPE_CHECKING:
     import numpy as np
 
 
-_SCOPE_DETECTION_INTERVAL: Final = 1.0 / 30.0
+_DEFAULT_SCOPE_DETECTION_INTERVAL: Final = 0.10
+_MIN_SCOPE_DETECTION_INTERVAL: Final = 0.05
+_SCOPED_WEAPONS: Final = frozenset({"weaponawp", "weaponssg08"})
 
 
 SPECIAL_KEYS = {
@@ -54,6 +57,7 @@ class Config:
     scope_blur_offset_x: int = 0
     scope_blur_offset_y: int = 0
     scope_blur_duration_ms: int = 0
+    scope_poll_interval: float = _DEFAULT_SCOPE_DETECTION_INTERVAL
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,6 +122,32 @@ def update_scope_blur_state(
     if previous.is_scoped is not True and duration_ms > 0:
         return ScopePixelState(is_scoped=True, blur_until=now + (duration_ms / 1000.0))
     return ScopePixelState(is_scoped=True, blur_until=previous.blur_until)
+
+
+def trigger_pixel_sampling_active(*, automation_permitted: bool, key_is_held: bool) -> bool:
+    return automation_permitted and key_is_held
+
+
+def visual_scope_detection_active(
+    *,
+    trigger_active: bool,
+    scope_pixel_configured: bool,
+    current_weapon: str | None,
+) -> bool:
+    if not trigger_active or not scope_pixel_configured or current_weapon is None:
+        return False
+    return canonical_weapon_name(current_weapon) in _SCOPED_WEAPONS
+
+
+def scope_detection_interval_seconds(config: dict[str, Any]) -> float:
+    raw = config.get("scope_poll_interval", _DEFAULT_SCOPE_DETECTION_INTERVAL)
+    try:
+        interval = float(raw)
+    except (TypeError, ValueError):
+        interval = _DEFAULT_SCOPE_DETECTION_INTERVAL
+    if interval <= 0.0:
+        return _DEFAULT_SCOPE_DETECTION_INTERVAL
+    return max(_MIN_SCOPE_DETECTION_INTERVAL, interval)
 
 
 def resolve_pixel_coordinates(
@@ -229,12 +259,14 @@ def read_single_pixel(sct, abs_x: int, abs_y: int, monitor) -> tuple[int, int, i
     return shot.pixel(0, 0)
 
 
-def capture_scope_frame(sct: Any, monitor: dict[str, int]) -> "np.ndarray":
+def capture_scope_patches(sct: Any, monitor: dict[str, int], patch_size: int) -> tuple["np.ndarray", "np.ndarray", "np.ndarray", "np.ndarray"]:
     import cv2
     import numpy as np
 
-    shot = sct.grab(monitor)
-    return cv2.cvtColor(np.asarray(shot, np.uint8), cv2.COLOR_BGRA2BGR)
+    return tuple(
+        cv2.cvtColor(np.asarray(sct.grab(region), np.uint8), cv2.COLOR_BGRA2BGR)
+        for region in scope_corner_capture_regions(monitor, patch_size)
+    )
 
 
 class PixelTriggerComponent(BaseComponent):
@@ -246,6 +278,8 @@ class PixelTriggerComponent(BaseComponent):
         self._stop = threading.Event()
         self._scope_pixel_state = ScopePixelState(is_scoped=None)
         self._scope_lock = threading.RLock()
+        self._current_weapon: str | None = None
+        self._weapon_lock = threading.RLock()
 
     def scope_state(self) -> bool | None:
         with self._scope_lock:
@@ -258,6 +292,14 @@ class PixelTriggerComponent(BaseComponent):
     def _set_scope_state(self, state: ScopePixelState) -> None:
         with self._scope_lock:
             self._scope_pixel_state = state
+
+    def _current_weapon_name(self) -> str | None:
+        with self._weapon_lock:
+            return self._current_weapon
+
+    def on_gsi_state(self, state: Any) -> None:
+        with self._weapon_lock:
+            self._current_weapon = getattr(state, "current_weapon", None)
 
     def start(self) -> None:
         super().start()
@@ -301,6 +343,7 @@ class PixelTriggerComponent(BaseComponent):
             scope_blur_offset_x=0 if raw_scope_blur_x in (None, "") else int(raw_scope_blur_x),
             scope_blur_offset_y=0 if raw_scope_blur_y in (None, "") else int(raw_scope_blur_y),
             scope_blur_duration_ms=max(0, 0 if raw_scope_blur_ms in (None, "") else int(raw_scope_blur_ms)),
+            scope_poll_interval=scope_detection_interval_seconds(self._config),
         )
 
         poll_interval = max(0.0005, cfg.poll_interval) if cfg.poll_interval > 0 else cfg.poll_interval
@@ -368,16 +411,6 @@ class PixelTriggerComponent(BaseComponent):
                             y=cfg.scope_monitor_pixel_y,
                         )
                         scope_detector = ScopeDetector()
-                        now = time.perf_counter()
-                        self._set_scope_state(
-                            update_scope_blur_state(
-                                self._pixel_scope_state(),
-                                detected_scoped=scope_detector.update(capture_scope_frame(sct, monitor)),
-                                now=now,
-                                duration_ms=cfg.scope_blur_duration_ms,
-                            ),
-                        )
-                        next_scope_detection_at = now + _SCOPE_DETECTION_INTERVAL
                     else:
                         self._set_scope_state(ScopePixelState(is_scoped=None))
 
@@ -391,39 +424,52 @@ class PixelTriggerComponent(BaseComponent):
                     def _resolve_pixel_coordinates(now: float) -> tuple[int, int]:
                         return selection.resolve(self._pixel_scope_state(), now)
 
-                    prev_abs_x, prev_abs_y = _resolve_pixel_coordinates(time.perf_counter())
-                    previous_color = read_single_pixel(sct, prev_abs_x, prev_abs_y, monitor)
+                    prev_abs_x: int | None = None
+                    prev_abs_y: int | None = None
+                    previous_color: tuple[int, int, int] | None = None
                     last_click_time = 0.0
                     pending_click = False
                     pending_click_time = 0.0
 
                     while not self._stop.is_set():
                         now = time.perf_counter()
-                        if scope_detector is not None and now >= next_scope_detection_at:
+                        key_is_held = hold_key in held_keys
+                        trigger_active = trigger_pixel_sampling_active(
+                            automation_permitted=self.automation_permitted(),
+                            key_is_held=key_is_held,
+                        )
+                        if not trigger_active:
+                            pending_click = False
+                            previous_color = None
+                            time.sleep(poll_interval)
+                            continue
+
+                        scope_active = visual_scope_detection_active(
+                            trigger_active=trigger_active,
+                            scope_pixel_configured=scope_detector is not None,
+                            current_weapon=self._current_weapon_name(),
+                        )
+                        if scope_active and scope_detector is not None and now >= next_scope_detection_at:
                             self._set_scope_state(
                                 update_scope_blur_state(
                                     self._pixel_scope_state(),
-                                    detected_scoped=scope_detector.update(capture_scope_frame(sct, monitor)),
+                                    detected_scoped=scope_detector.update_patches(
+                                        capture_scope_patches(sct, monitor, scope_detector.patch_size),
+                                    ),
                                     now=now,
                                     duration_ms=cfg.scope_blur_duration_ms,
                                 ),
                             )
-                            next_scope_detection_at = now + _SCOPE_DETECTION_INTERVAL
+                            next_scope_detection_at = now + cfg.scope_poll_interval
+                        elif not scope_active and self.scope_state() is not None:
+                            self._set_scope_state(ScopePixelState(is_scoped=None))
+
                         abs_x, abs_y = _resolve_pixel_coordinates(now)
                         # Reset previous_color when coordinates change (scope <-> unscoped switch)
                         # to prevent a false trigger from the pixel location change itself.
-                        if abs_x != prev_abs_x or abs_y != prev_abs_y:
+                        if previous_color is None or abs_x != prev_abs_x or abs_y != prev_abs_y:
                             prev_abs_x, prev_abs_y = abs_x, abs_y
                             previous_color = read_single_pixel(sct, abs_x, abs_y, monitor)
-                            time.sleep(poll_interval)
-                            continue
-                        current_color = read_single_pixel(sct, abs_x, abs_y, monitor)
-                        key_is_held = hold_key in held_keys
-
-                        dist = color_distance(previous_color, current_color)
-                        if not self.automation_permitted() or not key_is_held:
-                            pending_click = False
-                            previous_color = current_color
                             time.sleep(poll_interval)
                             continue
 
@@ -432,13 +478,17 @@ class PixelTriggerComponent(BaseComponent):
                                 mouse_controller.click(mouse.Button.left)
                                 last_click_time = now
                                 pending_click = False
-                                previous_color = current_color
+                                previous_color = read_single_pixel(sct, abs_x, abs_y, monitor)
                             time.sleep(poll_interval)
                             continue
 
+                        current_color = read_single_pixel(sct, abs_x, abs_y, monitor)
+
+                        dist = color_distance(previous_color, current_color)
                         if now - last_click_time >= cooldown and dist >= cfg.threshold:
                             pending_click = True
                             pending_click_time = now + click_delay
+                        previous_color = current_color
 
                         time.sleep(poll_interval)
 
@@ -448,24 +498,21 @@ class PixelTriggerComponent(BaseComponent):
                     points = build_monitor_points(center_x, center_y)
                     region = build_capture_region(points)
 
-                    previous_colors = read_all_pixels(sct, region, points)
+                    previous_colors = None
                     last_click_time = 0.0
                     pending_click = False
                     pending_click_time = 0.0
 
                     while not self._stop.is_set():
                         now = time.perf_counter()
-                        current_colors = read_all_pixels(sct, region, points)
                         key_is_held = hold_key in held_keys
-
-                        distances = {
-                            name: color_distance(previous_colors[name], current_colors[name])
-                            for name in previous_colors
-                        }
-
-                        if not self.automation_permitted() or not key_is_held:
+                        trigger_active = trigger_pixel_sampling_active(
+                            automation_permitted=self.automation_permitted(),
+                            key_is_held=key_is_held,
+                        )
+                        if not trigger_active:
                             pending_click = False
-                            previous_colors = current_colors
+                            previous_colors = None
                             time.sleep(poll_interval)
                             continue
 
@@ -474,9 +521,21 @@ class PixelTriggerComponent(BaseComponent):
                                 mouse_controller.click(mouse.Button.left)
                                 last_click_time = now
                                 pending_click = False
-                                previous_colors = current_colors
+                                previous_colors = read_all_pixels(sct, region, points)
                             time.sleep(poll_interval)
                             continue
+
+                        if previous_colors is None:
+                            previous_colors = read_all_pixels(sct, region, points)
+                            time.sleep(poll_interval)
+                            continue
+
+                        current_colors = read_all_pixels(sct, region, points)
+
+                        distances = {
+                            name: color_distance(previous_colors[name], current_colors[name])
+                            for name in previous_colors
+                        }
 
                         if now - last_click_time >= cooldown:
                             changed_points = []
@@ -489,6 +548,7 @@ class PixelTriggerComponent(BaseComponent):
                             if changed_points:
                                 pending_click = True
                                 pending_click_time = now + click_delay
+                        previous_colors = current_colors
 
                         time.sleep(poll_interval)
         except Exception as exc:

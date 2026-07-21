@@ -17,6 +17,9 @@ from app.components.pixel_trigger import (  # noqa: E402
     PixelMonitorSelection,
     ScopeBlurConfig,
     ScopePixelState,
+    trigger_pixel_sampling_active,
+    visual_scope_detection_active,
+    scope_detection_interval_seconds,
     update_scope_blur_state,
 )
 from app.device_service import DeviceService  # noqa: E402
@@ -102,6 +105,46 @@ class PixelTriggerScopeTests(unittest.TestCase):
         self.assertEqual(scoped.blur_until, 10.125)
         self.assertEqual(still_scoped.blur_until, 10.125)
         self.assertEqual(unscoped.blur_until, 0.0)
+
+    def test_trigger_pixel_sampling_requires_runtime_gate_and_hold_key(self) -> None:
+        self.assertFalse(trigger_pixel_sampling_active(automation_permitted=False, key_is_held=True))
+        self.assertFalse(trigger_pixel_sampling_active(automation_permitted=True, key_is_held=False))
+        self.assertTrue(trigger_pixel_sampling_active(automation_permitted=True, key_is_held=True))
+
+    def test_visual_scope_detection_requires_active_scope_pixel_and_sniper_weapon(self) -> None:
+        self.assertFalse(
+            visual_scope_detection_active(
+                trigger_active=False,
+                scope_pixel_configured=True,
+                current_weapon="weapon_awp",
+            ),
+        )
+        self.assertFalse(
+            visual_scope_detection_active(
+                trigger_active=True,
+                scope_pixel_configured=False,
+                current_weapon="weapon_awp",
+            ),
+        )
+        self.assertFalse(
+            visual_scope_detection_active(
+                trigger_active=True,
+                scope_pixel_configured=True,
+                current_weapon="weapon_ak47",
+            ),
+        )
+        self.assertTrue(
+            visual_scope_detection_active(
+                trigger_active=True,
+                scope_pixel_configured=True,
+                current_weapon="weapon_ssg08",
+            ),
+        )
+
+    def test_scope_detection_interval_is_independent_and_clamped(self) -> None:
+        self.assertEqual(scope_detection_interval_seconds({}), 0.10)
+        self.assertEqual(scope_detection_interval_seconds({"scope_poll_interval": 0.01}), 0.05)
+        self.assertEqual(scope_detection_interval_seconds({"scope_poll_interval": 0.25}), 0.25)
 
     def test_gsi_scoped_field_does_not_drive_pixel_trigger_scope_state(self) -> None:
         component = PixelTriggerComponent()

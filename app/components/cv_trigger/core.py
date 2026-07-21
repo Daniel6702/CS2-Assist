@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import threading
 import time
+import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -17,8 +19,13 @@ from .activation import (
     key_to_name,
 )
 from .capture import Grab
-from .detection import PositionSmoother, ScopeDetector
+from .detection import PositionSmoother, ScopeDetector, scope_corner_capture_regions
+from .inference import InferenceConfig, UltralyticsInferenceEngine
+from .input_worker import InputWorker
+from .metrics import CVPerfStats
 from .migration import _migrate_legacy_config
+from .roi import CaptureRegion, compute_center_roi
+from .runtime_rules import compile_rules, highest_priority_rules
 from .patterns import (
     PATTERNS_FILE,
     _CLASS_INDEX_BY_SIDE_AND_TYPE,
@@ -27,6 +34,7 @@ from .patterns import (
     _scaled_recoil_pattern_steps,
     _truthy,
 )
+from .postprocess import extract_filtered_detections
 from .virtual_mouse import VirtualMouse
 
 
@@ -195,6 +203,50 @@ def _anti_oscillation_reversal_lock_frames(
     x_reversed = previous_sign[0] != 0 and current_sign[0] != 0 and previous_sign[0] != current_sign[0]
     y_reversed = previous_sign[1] != 0 and current_sign[1] != 0 and previous_sign[1] != current_sign[1]
     return lock_frames if x_reversed or y_reversed else 0
+
+
+def _full_capture_region(monitor: dict[str, int]) -> CaptureRegion:
+    return CaptureRegion(
+        monitor_left=int(monitor.get("left", 0)),
+        monitor_top=int(monitor.get("top", 0)),
+        roi_left=0,
+        roi_top=0,
+        width=max(1, int(monitor.get("width", 1))),
+        height=max(1, int(monitor.get("height", 1))),
+    )
+
+
+def _capture_region_for_config(
+    *,
+    monitor: dict[str, int],
+    enabled_configs: dict[str, dict[str, Any]],
+    inference_img_size: int,
+    config: dict[str, Any],
+) -> CaptureRegion:
+    mode = str(config.get("capture_mode", "auto") or "auto").strip().lower()
+    if mode == "full" or mode not in {"auto", "roi"}:
+        return _full_capture_region(monitor)
+
+    snap_values: list[int] = []
+    zone_values: list[int] = []
+    for item in enabled_configs.values():
+        snap_values.append(max(0, int(item.get("SNAP_DISTANCE", 200) or 200)))
+        zone_values.append(max(0, int(item.get("AUTO_SHOOT_ZONE_WIDTH", 28) or 28)))
+        zone_values.append(max(0, int(item.get("AUTO_SHOOT_ZONE_HEIGHT", 36) or 36)))
+    max_snap_distance = max(snap_values) if snap_values else 200
+    default_padding = max(96, max(zone_values) if zone_values else 0, int(max_snap_distance * 0.5))
+    roi_padding_px = int(config.get("roi_padding_px", default_padding) or default_padding)
+    roi_min_size_px = int(config.get("roi_min_size_px", inference_img_size) or inference_img_size)
+    raw_max_size = config.get("roi_max_size_px")
+    roi_max_size_px = None if raw_max_size in (None, "") else int(raw_max_size)
+    return compute_center_roi(
+        monitor=monitor,
+        max_snap_distance=max_snap_distance,
+        inference_img_size=inference_img_size,
+        roi_padding_px=roi_padding_px,
+        roi_min_size_px=roi_min_size_px,
+        roi_max_size_px=roi_max_size_px,
+    )
 
 
 class CVTriggerComponent(BaseComponent):
@@ -460,6 +512,9 @@ class CVTriggerComponent(BaseComponent):
 
     def _run(self) -> None:
         try:
+            import numpy as np
+            import cv2
+            import mss
             import torch
             from pynput import keyboard, mouse
             from ultralytics import YOLO
@@ -485,6 +540,7 @@ class CVTriggerComponent(BaseComponent):
             self._thread = None
             return
         aim_curves = dict(config.get("aim_curves", {}) or {})
+        compiled_rules = compile_rules(enabled_configs, aim_curves)
 
         pattern_file = _load_pattern_file(PATTERNS_FILE)
         recoil_sync = dict(config.get("recoil_sync", {}) or {})
@@ -501,6 +557,9 @@ class CVTriggerComponent(BaseComponent):
         anti_oscillation_radius_px = max(0.0, float(24.0 if anti_oscillation_radius_raw is None else anti_oscillation_radius_raw))
         anti_oscillation_reserve_counts = max(0, int(1 if anti_oscillation_reserve_raw is None else anti_oscillation_reserve_raw))
         anti_oscillation_lock_frames = max(0, int(2 if anti_oscillation_lock_raw is None else anti_oscillation_lock_raw))
+        perf_enabled = _truthy(config.get("perf_enabled", False)) or os.environ.get("CS2_ASSIST_CV_PERF") == "1"
+        perf_stats = CVPerfStats(enabled=perf_enabled)
+        perf_output_path = str(config.get("perf_output_path", "") or os.environ.get("CS2_ASSIST_CV_PERF_OUT", ""))
 
         try:
             vmouse = VirtualMouse()
@@ -508,6 +567,8 @@ class CVTriggerComponent(BaseComponent):
             self.status(str(exc), "error")
             self._thread = None
             return
+        input_worker = InputWorker(vmouse)
+        input_worker.start()
 
         model = YOLO(str(model_path))
         device = 0 if torch.cuda.is_available() else "cpu"
@@ -515,6 +576,14 @@ class CVTriggerComponent(BaseComponent):
             half_model = getattr(getattr(model, "model", None), "half", None)
             if callable(half_model):
                 half_model()
+        inference_engine = UltralyticsInferenceEngine(
+            model=model,
+            config=InferenceConfig(
+                confidence=inference_confidence,
+                image_size=inference_img_size,
+                device=device,
+            ),
+        )
 
         mon_width = int(monitor["width"])
         mon_height = int(monitor["height"])
@@ -522,6 +591,21 @@ class CVTriggerComponent(BaseComponent):
         game_height = int(game_resolution["height"])
         cx = mon_width // 2
         cy = mon_height // 2
+        capture_region = _capture_region_for_config(
+            monitor=monitor,
+            enabled_configs=enabled_configs,
+            inference_img_size=inference_img_size,
+            config=config,
+        )
+        try:
+            with perf_stats.timer("inference_warmup_ms"):
+                inference_engine.warmup(
+                    np.zeros((capture_region.height, capture_region.width, 3), dtype=np.uint8),
+                )
+        except StopIteration:
+            self.status("CV inference warmup returned no result; continuing without warmup result.", "warning")
+        except RuntimeError as exc:
+            self.status(f"CV inference warmup failed: {exc}", "warning")
 
         per_rule_smooth: dict[str, tuple[float, float] | None] = {}
 
@@ -545,12 +629,13 @@ class CVTriggerComponent(BaseComponent):
         key_listener.start()
         mouse_listener.start()
 
-        grab = Grab(monitor, status_callback=self.status)
+        grab = Grab(monitor, status_callback=self.status, region=capture_region, perf_stats=perf_stats)
         grab.start()
-        while not self._stop.is_set() and grab.frame() is None:
-            time.sleep(0.01)
 
         scope_detector = ScopeDetector()
+        requires_visual_scope = any(rule.requires_scope for rule in compiled_rules.values())
+        scope_capture_regions = scope_corner_capture_regions(monitor, scope_detector.patch_size) if requires_visual_scope else ()
+        scope_capture = None
         pos_smoother = PositionSmoother(alpha=2.0 / (max(1, int(position_smoothing_frames)) + 1.0))
 
         settle: dict[str, int] = {name: 0 for name in enabled_configs}
@@ -561,14 +646,25 @@ class CVTriggerComponent(BaseComponent):
         reversal_locks: dict[str, int] = {name: 0 for name in enabled_configs}
         previous_active: tuple[str, ...] = ()
         status_every = 0.0
+        run_started = time.perf_counter()
+        frames_processed = 0
         self.status("Started.")
 
         try:
+            scope_capture = mss.mss() if requires_visual_scope else None
             while not self._stop.is_set():
-                time.sleep(0.001)
-                frame = grab.frame()
-                if frame is None:
+                with perf_stats.timer("loop_wait_ms"):
+                    frame_info = grab.next_frame(timeout=0.1)
+                if frame_info is None:
                     continue
+                frame_started_ns = time.perf_counter_ns()
+                frames_processed += 1
+                frame = frame_info.data
+                if perf_stats.enabled:
+                    frame_age_ms = (frame_started_ns - frame_info.captured_at_ns) / 1_000_000.0
+                    perf_stats.record_ms("frame_age_ms", frame_age_ms)
+                with perf_stats.timer("preprocess_ms"):
+                    pass
 
                 if not self.automation_permitted():
                     for name in settle:
@@ -582,20 +678,34 @@ class CVTriggerComponent(BaseComponent):
                     previous_active = ()
                     self._set_overlay_state(False)
                     time.sleep(0.01)
+                    if perf_stats.enabled:
+                        perf_stats.record_ms("end_to_end_ms", (time.perf_counter_ns() - frame_started_ns) / 1_000_000.0)
                     continue
 
-                current_weapon = self._current_weapon_name()
-                scoped_visual = scope_detector.update(frame)
-                global_target_sides = self._global_target_sides(config)
+                with perf_stats.timer("rule_select_ms"):
+                    current_weapon = self._current_weapon_name()
+                    scoped_visual = False
+                    rules_matching_without_scope = [
+                        rule
+                        for rule in compiled_rules.values()
+                        if activation.is_active(rule.activation)
+                        and rule.weapon_allowed(current_weapon)
+                    ]
+                    if any(rule.requires_scope for rule in rules_matching_without_scope):
+                        with perf_stats.timer("scope_sample_ms"):
+                            if capture_region.roi_left == 0 and capture_region.roi_top == 0 and capture_region.width == mon_width and capture_region.height == mon_height:
+                                scoped_visual = scope_detector.update(frame)
+                            elif scope_capture is not None:
+                                scoped_visual = scope_detector.update_patches(
+                                    tuple(
+                                        cv2.cvtColor(np.asarray(scope_capture.grab(region), np.uint8), cv2.COLOR_BGRA2BGR)
+                                        for region in scope_capture_regions
+                                    ),
+                                )
+                    global_target_sides = self._global_target_sides(config)
 
-                active_names = [
-                    name
-                    for name, item in enabled_configs.items()
-                    if activation.is_active(dict(item.get("activation", {"device": "keyboard", "key": "alt"})))
-                    and self._weapon_allowed(item)
-                    and self._scope_allowed(item, scoped_visual)
-                ]
-                active_names = _highest_priority_rule_names(enabled_configs, active_names)
+                    active_rules = highest_priority_rules([rule for rule in rules_matching_without_scope if rule.scope_allowed(scoped_visual)])
+                    active_names = [rule.name for rule in active_rules]
                 active_name_set = set(active_names)
                 for name in enabled_configs:
                     if name not in active_name_set:
@@ -620,30 +730,26 @@ class CVTriggerComponent(BaseComponent):
 
                 if not active_names:
                     self._set_overlay_state(False)
+                    if perf_stats.enabled:
+                        perf_stats.record_ms("end_to_end_ms", (time.perf_counter_ns() - frame_started_ns) / 1_000_000.0)
                     continue
+
+                active_target_classes: set[int] = set()
+                for rule in active_rules:
+                    active_target_classes.update(rule.target_classes(global_target_sides))
 
                 # Detect kill via GSI and apply aim cooldown to all active rules
                 if self._consume_kill_event():
                     _now = time.time()
-                    for name in active_names:
-                        cfg = enabled_configs[name]
-                        aim_cd_ms = float(cfg.get("auto_shoot_aim_cooldown_ms", 0))
+                    for rule in active_rules:
+                        name = rule.name
+                        aim_cd_ms = rule.aim_cooldown_ms
                         if aim_cd_ms > 0:
                             aim_cooldown_until[name] = _now + aim_cd_ms / 1000.0
 
                 try:
-                    result = next(
-                        iter(
-                            model.predict(
-                                frame,
-                                conf=inference_confidence,
-                                imgsz=inference_img_size,
-                                device=device,
-                                stream=True,
-                                verbose=False,
-                            )
-                        )
-                    )
+                    with perf_stats.timer("inference_ms"):
+                        result = inference_engine.predict(frame)
                 except StopIteration:
                     for name in active_names:
                         settle[name] = 0
@@ -651,15 +757,23 @@ class CVTriggerComponent(BaseComponent):
                         raw_error_signs[name] = None
                         reversal_locks[name] = 0
                     self._set_overlay_state(False)
+                    if perf_stats.enabled:
+                        perf_stats.record_ms("end_to_end_ms", (time.perf_counter_ns() - frame_started_ns) / 1_000_000.0)
                     continue
 
-                boxes = getattr(result, "boxes", None)
-                if boxes is None:
-                    boxes_xyxy = []
-                    boxes_cls = []
-                else:
-                    boxes_xyxy = boxes.xyxy.cpu().numpy()
-                    boxes_cls = boxes.cls.cpu().numpy()
+                with perf_stats.timer("postprocess_ms"):
+                    boxes = getattr(result, "boxes", None)
+                    with perf_stats.timer("cpu_transfer_ms"):
+                        extracted = extract_filtered_detections(
+                            boxes=boxes,
+                            target_class_ids=active_target_classes,
+                            roi_left=capture_region.roi_left,
+                            roi_top=capture_region.roi_top,
+                        )
+                    boxes_xyxy = extracted.boxes_xyxy
+                    boxes_cls = extracted.boxes_cls
+                    perf_stats.record_count("source_boxes_count", extracted.source_count)
+                    perf_stats.record_count("selected_boxes_count", extracted.selected_count)
 
                 overlay_set = False
                 movement_candidates: list[dict[str, Any]] = []
@@ -667,316 +781,342 @@ class CVTriggerComponent(BaseComponent):
                 base_sens_mult_x = round((game_width / mon_width) / max(user_sens, 1e-6), 4)
                 base_sens_mult_y = round((game_height / mon_height) / max(user_sens, 1e-6), 4)
 
-                for name in active_names:
-                    cfg = enabled_configs[name]
-                    now = time.time()
+                with perf_stats.timer("candidate_ms"):
+                    for rule in active_rules:
+                        name = rule.name
+                        cfg = rule.raw
+                        now = time.time()
 
-                    target_classes = self._resolve_rule_target_classes(cfg, global_target_sides)
-                    if not target_classes:
-                        settle[name] = 0
-                        filtered_error[name] = None
-                        raw_error_signs[name] = None
-                        reversal_locks[name] = 0
-                        pos_smoother.reset(name)
-                        continue
-
-                    aim_strength = float(cfg.get("AIM_STRENGTH", 0.5))
-                    sens_mult_x = round(base_sens_mult_x, 4)
-                    sens_mult_y = round(base_sens_mult_y, 4)
-                    snap_distance = int(cfg.get("SNAP_DISTANCE", 200))
-                    max_aim_speed_px = int(cfg.get("MAX_AIM_SPEED_PX", 50))
-                    curve_points = _curve_points_for_rule(aim_curves, str(cfg.get("AIM_CURVE_ID", "linear")))
-                    aim_smoothing_alpha = float(cfg.get("SMOOTHING_ALPHA", 0.0))
-                    noise_amount = float(cfg.get("NOISE_AMOUNT", 0.0))
-
-                    aim_mode = str(cfg["AIM_MODE"]).lower()
-                    snap_r2 = snap_distance * snap_distance
-                    auto_shoot = _truthy(cfg.get("auto_shoot", True))
-                    zone_width = int(cfg.get("AUTO_SHOOT_ZONE_WIDTH", 28))
-                    zone_height = int(cfg.get("AUTO_SHOOT_ZONE_HEIGHT", 36))
-                    zone_y_pos = float(cfg.get("AUTO_SHOOT_ZONE_Y_POS", 0.35))
-
-                    left_button_held = activation.button_held("left")
-                    spray_offset_x, spray_offset_y = self._spray_target_offset_for_rule(
-                        cfg=cfg,
-                        pattern_file=pattern_file,
-                        recoil_sync=recoil_sync,
-                        fallback_program_sens=user_sens,
-                        left_button_held=left_button_held,
-                    )
-                    if not overlay_set and left_button_held and _truthy(cfg.get("spray_target_offset_enabled", False)):
-                        self._set_overlay_state(True, spray_offset_x, spray_offset_y, name)
-                        overlay_set = True
-
-                    best_movement = None
-                    best_click = None
-                    for box, cls in zip(boxes_xyxy, boxes_cls):
-                        if int(cls) not in target_classes:
+                        target_classes = rule.target_classes(global_target_sides)
+                        if not target_classes:
+                            settle[name] = 0
+                            filtered_error[name] = None
+                            raw_error_signs[name] = None
+                            reversal_locks[name] = 0
+                            pos_smoother.reset(name)
                             continue
 
-                        x1, y1, x2, y2 = map(int, box[:4])
-                        box_tuple = (x1, y1, x2, y2)
-                        tx, ty = _aim_point_for_box(
-                            box=box_tuple,
-                            crosshair=(cx, cy),
-                            aim_mode=aim_mode,
-                            head_offset=float(cfg["HEAD_OFFSET"]),
-                            body_knee_offset=float(cfg.get("BODY_KNEE_OFFSET", 0.50)),
+                        aim_strength = rule.aim_strength
+                        sens_mult_x = round(base_sens_mult_x, 4)
+                        sens_mult_y = round(base_sens_mult_y, 4)
+                        snap_distance = rule.snap_distance
+                        max_aim_speed_px = rule.max_aim_speed_px
+                        curve_points = list(rule.curve_points)
+                        aim_smoothing_alpha = rule.aim_smoothing_alpha
+                        noise_amount = rule.noise_amount
+
+                        aim_mode = rule.aim_mode
+                        snap_r2 = rule.snap_radius_sq
+                        auto_shoot = rule.auto_shoot
+                        zone_width = rule.zone_width
+                        zone_height = rule.zone_height
+                        zone_y_pos = rule.zone_y_pos
+
+                        left_button_held = activation.button_held("left")
+                        spray_offset_x, spray_offset_y = self._spray_target_offset_for_rule(
+                            cfg=cfg,
+                            pattern_file=pattern_file,
+                            recoil_sync=recoil_sync,
+                            fallback_program_sens=user_sens,
+                            left_button_held=left_button_held,
                         )
-                        body_y_axis_loose = _body_y_axis_is_loose(
-                            box=box_tuple,
-                            crosshair=(cx, cy),
-                            aim_mode=aim_mode,
-                            body_knee_offset=float(cfg.get("BODY_KNEE_OFFSET", 0.50)),
-                        )
+                        if not overlay_set and left_button_held and rule.spray_target_offset_enabled:
+                            self._set_overlay_state(True, spray_offset_x, spray_offset_y, name)
+                            overlay_set = True
 
-                        pred_bullet_cx = cx - spray_offset_x
-                        pred_bullet_cy = cy - spray_offset_y
+                        best_movement = None
+                        best_click = None
+                        for box, cls in zip(boxes_xyxy, boxes_cls):
+                            if int(cls) not in target_classes:
+                                continue
 
-                        target_dx_from_center = tx - cx
-                        target_dy_from_center = ty - cy
-                        pred_dx_from_center = pred_bullet_cx - cx
-                        pred_dy_from_center = pred_bullet_cy - cy
+                            x1, y1, x2, y2 = map(int, box[:4])
+                            box_tuple = (x1, y1, x2, y2)
+                            tx, ty = _aim_point_for_box(
+                                box=box_tuple,
+                                crosshair=(cx, cy),
+                                aim_mode=aim_mode,
+                                head_offset=rule.head_offset,
+                                body_knee_offset=rule.body_knee_offset,
+                            )
+                            body_y_axis_loose = _body_y_axis_is_loose(
+                                box=box_tuple,
+                                crosshair=(cx, cy),
+                                aim_mode=aim_mode,
+                                body_knee_offset=rule.body_knee_offset,
+                            )
 
-                        err_x, err_y = _raw_aim_error(
-                            target=(float(tx), float(ty)),
-                            predicted_bullet=(float(pred_bullet_cx), float(pred_bullet_cy)),
-                            body_y_axis_loose=body_y_axis_loose,
-                        )
+                            pred_bullet_cx = cx - spray_offset_x
+                            pred_bullet_cy = cy - spray_offset_y
 
-                        if (
-                            pred_dx_from_center != 0
-                            and target_dx_from_center * pred_dx_from_center > 0
-                            and abs(target_dx_from_center) <= abs(pred_dx_from_center)
-                        ):
-                            err_x = 0.0
+                            target_dx_from_center = tx - cx
+                            target_dy_from_center = ty - cy
+                            pred_dx_from_center = pred_bullet_cx - cx
+                            pred_dy_from_center = pred_bullet_cy - cy
 
-                        if (
-                            pred_dy_from_center != 0
-                            and target_dy_from_center * pred_dy_from_center > 0
-                            and abs(target_dy_from_center) <= abs(pred_dy_from_center)
-                        ):
-                            err_y = 0.0
+                            err_x, err_y = _raw_aim_error(
+                                target=(float(tx), float(ty)),
+                                predicted_bullet=(float(pred_bullet_cx), float(pred_bullet_cy)),
+                                body_y_axis_loose=body_y_axis_loose,
+                            )
 
-                        aim_d2 = (tx - cx) * (tx - cx) + (ty - cy) * (ty - cy)
-                        if aim_d2 <= snap_r2 and (best_movement is None or aim_d2 < best_movement["d2"]):
-                            best_movement = {
-                                "raw_err_x": float(err_x),
-                                "raw_err_y": float(err_y),
-                                "d2": float(aim_d2),
-                                "target_tx": float(tx),
-                                "target_ty": float(ty),
-                                "pred_bullet_cx": float(pred_bullet_cx),
-                                "pred_bullet_cy": float(pred_bullet_cy),
-                                "body_y_axis_loose": body_y_axis_loose,
-                            }
+                            if (
+                                pred_dx_from_center != 0
+                                and target_dx_from_center * pred_dx_from_center > 0
+                                and abs(target_dx_from_center) <= abs(pred_dx_from_center)
+                            ):
+                                err_x = 0.0
 
-                        if _auto_shoot_zone_contains_crosshair(
-                            box=box_tuple,
-                            crosshair=(cx, cy),
-                            zone_width=zone_width,
-                            zone_height=zone_height,
-                            zone_y_pos=zone_y_pos,
-                        ):
-                            box_cx = (x1 + x2) >> 1
-                            box_cy = (y1 + y2) >> 1
-                            center_d2 = (box_cx - cx) * (box_cx - cx) + (box_cy - cy) * (box_cy - cy)
-                            if best_click is None or center_d2 < best_click["d2"]:
-                                best_click = {
-                                    "d2": float(center_d2),
+                            if (
+                                pred_dy_from_center != 0
+                                and target_dy_from_center * pred_dy_from_center > 0
+                                and abs(target_dy_from_center) <= abs(pred_dy_from_center)
+                            ):
+                                err_y = 0.0
+
+                            aim_d2 = (tx - cx) * (tx - cx) + (ty - cy) * (ty - cy)
+                            if aim_d2 <= snap_r2 and (best_movement is None or aim_d2 < best_movement["d2"]):
+                                best_movement = {
+                                    "raw_err_x": float(err_x),
+                                    "raw_err_y": float(err_y),
+                                    "d2": float(aim_d2),
+                                    "target_tx": float(tx),
+                                    "target_ty": float(ty),
+                                    "pred_bullet_cx": float(pred_bullet_cx),
+                                    "pred_bullet_cy": float(pred_bullet_cy),
+                                    "body_y_axis_loose": body_y_axis_loose,
                                 }
 
-                    if best_movement is None and best_click is None:
-                        settle[name] = 0
-                        filtered_error[name] = None
-                        per_rule_smooth.pop(name, None)
-                        raw_error_signs[name] = None
-                        reversal_locks[name] = 0
-                        pos_smoother.reset(name)
-                        continue
+                            if _auto_shoot_zone_contains_crosshair(
+                                box=box_tuple,
+                                crosshair=(cx, cy),
+                                zone_width=zone_width,
+                                zone_height=zone_height,
+                                zone_y_pos=zone_y_pos,
+                            ):
+                                box_cx = (x1 + x2) >> 1
+                                box_cy = (y1 + y2) >> 1
+                                center_d2 = (box_cx - cx) * (box_cx - cx) + (box_cy - cy) * (box_cy - cy)
+                                if best_click is None or center_d2 < best_click["d2"]:
+                                    best_click = {
+                                        "d2": float(center_d2),
+                                    }
 
-                    if best_movement is not None:
-                        raw_tx = float(best_movement["target_tx"])
-                        raw_ty = float(best_movement["target_ty"])
-                        # Smooth raw detections to dampen YOLO bounding-box jitter
-                        smooth_tx, smooth_ty = pos_smoother.smooth(name, raw_tx, raw_ty)
-
-                        target_tx = smooth_tx
-                        target_ty = smooth_ty
-                        pred_bullet_cx = float(best_movement["pred_bullet_cx"])
-                        pred_bullet_cy = float(best_movement["pred_bullet_cy"])
-
-                        target_dx_from_center = target_tx - cx
-                        target_dy_from_center = target_ty - cy
-                        pred_dx_from_center = pred_bullet_cx - cx
-                        pred_dy_from_center = pred_bullet_cy - cy
-
-                        raw_dx, raw_dy = _raw_aim_error(
-                            target=(target_tx, target_ty),
-                            predicted_bullet=(pred_bullet_cx, pred_bullet_cy),
-                            body_y_axis_loose=bool(best_movement["body_y_axis_loose"]),
-                        )
-
-                        if (
-                            pred_dx_from_center != 0
-                            and target_dx_from_center * pred_dx_from_center > 0
-                            and abs(target_dx_from_center) <= abs(pred_dx_from_center)
-                        ):
-                            raw_dx = 0.0
-
-                        if (
-                            pred_dy_from_center != 0
-                            and target_dy_from_center * pred_dy_from_center > 0
-                            and abs(target_dy_from_center) <= abs(pred_dy_from_center)
-                        ):
-                            raw_dy = 0.0
-
-                        dist = (raw_dx * raw_dx + raw_dy * raw_dy) ** 0.5
-                        limit_dx = float(best_movement["raw_err_x"])
-                        limit_dy = float(best_movement["raw_err_y"])
-                        limit_dist = (limit_dx * limit_dx + limit_dy * limit_dy) ** 0.5
-                        raw_sign = _raw_error_sign((limit_dx, limit_dy), jitter_deadzone_px)
-                        new_lock = _anti_oscillation_reversal_lock_frames(
-                            previous_sign=raw_error_signs.get(name),
-                            current_sign=raw_sign,
-                            distance_px=limit_dist,
-                            radius_px=anti_oscillation_radius_px,
-                            lock_frames=anti_oscillation_lock_frames,
-                        )
-                        if new_lock > 0:
-                            reversal_locks[name] = new_lock
-                        raw_error_signs[name] = raw_sign
-
-                        if reversal_locks.get(name, 0) > 0:
-                            reversal_locks[name] = max(0, reversal_locks[name] - 1)
+                        if best_movement is None and best_click is None:
+                            settle[name] = 0
                             filtered_error[name] = None
                             per_rule_smooth.pop(name, None)
+                            raw_error_signs[name] = None
+                            reversal_locks[name] = 0
+                            pos_smoother.reset(name)
                             continue
 
-                        prev = filtered_error.get(name)
-                        if prev is None or dist >= near_smoothing_radius_px:
-                            filt_dx = raw_dx
-                            filt_dy = raw_dy
+                        if best_movement is not None:
+                            raw_tx = float(best_movement["target_tx"])
+                            raw_ty = float(best_movement["target_ty"])
+                            # Smooth raw detections to dampen YOLO bounding-box jitter
+                            smooth_tx, smooth_ty = pos_smoother.smooth(name, raw_tx, raw_ty)
+
+                            target_tx = smooth_tx
+                            target_ty = smooth_ty
+                            pred_bullet_cx = float(best_movement["pred_bullet_cx"])
+                            pred_bullet_cy = float(best_movement["pred_bullet_cy"])
+
+                            target_dx_from_center = target_tx - cx
+                            target_dy_from_center = target_ty - cy
+                            pred_dx_from_center = pred_bullet_cx - cx
+                            pred_dy_from_center = pred_bullet_cy - cy
+
+                            raw_dx, raw_dy = _raw_aim_error(
+                                target=(target_tx, target_ty),
+                                predicted_bullet=(pred_bullet_cx, pred_bullet_cy),
+                                body_y_axis_loose=bool(best_movement["body_y_axis_loose"]),
+                            )
+
+                            if (
+                                pred_dx_from_center != 0
+                                and target_dx_from_center * pred_dx_from_center > 0
+                                and abs(target_dx_from_center) <= abs(pred_dx_from_center)
+                            ):
+                                raw_dx = 0.0
+
+                            if (
+                                pred_dy_from_center != 0
+                                and target_dy_from_center * pred_dy_from_center > 0
+                                and abs(target_dy_from_center) <= abs(pred_dy_from_center)
+                            ):
+                                raw_dy = 0.0
+
+                            dist = (raw_dx * raw_dx + raw_dy * raw_dy) ** 0.5
+                            limit_dx = float(best_movement["raw_err_x"])
+                            limit_dy = float(best_movement["raw_err_y"])
+                            limit_dist = (limit_dx * limit_dx + limit_dy * limit_dy) ** 0.5
+                            raw_sign = _raw_error_sign((limit_dx, limit_dy), jitter_deadzone_px)
+                            new_lock = _anti_oscillation_reversal_lock_frames(
+                                previous_sign=raw_error_signs.get(name),
+                                current_sign=raw_sign,
+                                distance_px=limit_dist,
+                                radius_px=anti_oscillation_radius_px,
+                                lock_frames=anti_oscillation_lock_frames,
+                            )
+                            if new_lock > 0:
+                                reversal_locks[name] = new_lock
+                            raw_error_signs[name] = raw_sign
+
+                            if reversal_locks.get(name, 0) > 0:
+                                reversal_locks[name] = max(0, reversal_locks[name] - 1)
+                                filtered_error[name] = None
+                                per_rule_smooth.pop(name, None)
+                                continue
+
+                            prev = filtered_error.get(name)
+                            if prev is None or dist >= near_smoothing_radius_px:
+                                filt_dx = raw_dx
+                                filt_dy = raw_dy
+                            else:
+                                adaptive_alpha = max(near_smoothing_alpha, min(1.0, dist / max(1.0, near_smoothing_radius_px)))
+                                filt_dx = prev[0] + adaptive_alpha * (raw_dx - prev[0])
+                                filt_dy = prev[1] + adaptive_alpha * (raw_dy - prev[1])
+
+                            if abs(filt_dx) <= jitter_deadzone_px:
+                                filt_dx = 0.0
+                            if abs(filt_dy) <= jitter_deadzone_px:
+                                filt_dy = 0.0
+                            filt_dx, filt_dy = _lock_body_y_axis(
+                                (filt_dx, filt_dy),
+                                body_y_axis_loose=bool(best_movement["body_y_axis_loose"]),
+                            )
+
+                            filtered_error[name] = (filt_dx, filt_dy)
+                            if now >= aim_cooldown_until.get(name, 0.0):
+                                movement_candidates.append({
+                                    "name": name,
+                                    "cfg": cfg,
+                                    "sens_mult_x": sens_mult_x,
+                                    "sens_mult_y": sens_mult_y,
+                                    "dx": float(filt_dx),
+                                    "dy": float(filt_dy),
+                                    "limit_dx": limit_dx,
+                                    "limit_dy": limit_dy,
+                                    "d2": best_movement["d2"],
+                                    "now": now,
+                                    "aim_strength": aim_strength,
+                                    "snap_distance": snap_distance,
+                                    "max_aim_speed_px": max_aim_speed_px,
+                                    "curve_points": curve_points,
+                                    "aim_smoothing_alpha": aim_smoothing_alpha,
+                                    "noise_amount": noise_amount,
+                                    "anti_oscillation_radius_px": anti_oscillation_radius_px,
+                                    "anti_oscillation_reserve_counts": anti_oscillation_reserve_counts,
+                                    "body_y_axis_loose": best_movement["body_y_axis_loose"],
+                                })
                         else:
-                            adaptive_alpha = max(near_smoothing_alpha, min(1.0, dist / max(1.0, near_smoothing_radius_px)))
-                            filt_dx = prev[0] + adaptive_alpha * (raw_dx - prev[0])
-                            filt_dy = prev[1] + adaptive_alpha * (raw_dy - prev[1])
+                            filtered_error[name] = None
+                            per_rule_smooth.pop(name, None)
+                            raw_error_signs[name] = None
+                            reversal_locks[name] = 0
+                            pos_smoother.reset(name)
 
-                        if abs(filt_dx) <= jitter_deadzone_px:
-                            filt_dx = 0.0
-                        if abs(filt_dy) <= jitter_deadzone_px:
-                            filt_dy = 0.0
-                        filt_dx, filt_dy = _lock_body_y_axis(
-                            (filt_dx, filt_dy),
-                            body_y_axis_loose=bool(best_movement["body_y_axis_loose"]),
-                        )
-
-                        filtered_error[name] = (filt_dx, filt_dy)
-                        if now >= aim_cooldown_until.get(name, 0.0):
-                            movement_candidates.append({
-                                "name": name,
-                                "cfg": cfg,
-                                "sens_mult_x": sens_mult_x,
-                                "sens_mult_y": sens_mult_y,
-                                "dx": float(filt_dx),
-                                "dy": float(filt_dy),
-                                "limit_dx": limit_dx,
-                                "limit_dy": limit_dy,
-                                "d2": best_movement["d2"],
-                                "now": now,
-                                "aim_strength": aim_strength,
-                                "snap_distance": snap_distance,
-                                "max_aim_speed_px": max_aim_speed_px,
-                                "curve_points": curve_points,
-                                "aim_smoothing_alpha": aim_smoothing_alpha,
-                                "noise_amount": noise_amount,
-                                "anti_oscillation_radius_px": anti_oscillation_radius_px,
-                                "anti_oscillation_reserve_counts": anti_oscillation_reserve_counts,
-                                "body_y_axis_loose": best_movement["body_y_axis_loose"],
-                            })
-                    else:
-                        filtered_error[name] = None
-                        per_rule_smooth.pop(name, None)
-                        raw_error_signs[name] = None
-                        reversal_locks[name] = 0
-                        pos_smoother.reset(name)
-
-                    if best_click is not None:
-                        threshold = max(1, int(cfg["SETTLE_FRAMES"]))
-                        settle[name] = min(threshold, settle[name] + 1)
-                        if settle[name] >= threshold and auto_shoot and not _shot_cooldown_active(now=now, cooldown_until=cooldown_until[name]):
-                            click_ready.append({
-                                "name": name,
-                                "cfg": cfg,
-                                "d2": best_click["d2"],
-                                "now": now,
-                            })
-                        elif settle[name] >= threshold:
-                            settle[name] = threshold
-                    else:
-                        settle[name] = 0
+                        if best_click is not None:
+                            threshold = rule.settle_frames
+                            settle[name] = min(threshold, settle[name] + 1)
+                            if settle[name] >= threshold and auto_shoot and not _shot_cooldown_active(now=now, cooldown_until=cooldown_until[name]):
+                                click_ready.append({
+                                    "name": name,
+                                    "cfg": cfg,
+                                    "d2": best_click["d2"],
+                                    "now": now,
+                                    "hold_ms": rule.click_hold_ms,
+                                })
+                            elif settle[name] >= threshold:
+                                settle[name] = threshold
+                        else:
+                            settle[name] = 0
 
                 if not overlay_set:
                     self._set_overlay_state(False)
 
                 if not movement_candidates and not click_ready:
+                    if perf_stats.enabled:
+                        perf_stats.record_ms("end_to_end_ms", (time.perf_counter_ns() - frame_started_ns) / 1_000_000.0)
                     continue
 
                 if movement_candidates:
-                    motions: list[aim_motion.AimMotionResult] = []
-                    for m in movement_candidates:
-                        error_px = _smoothed_error_for_rule(
-                            rule_name=m["name"],
-                            error_px=(m["dx"], m["dy"]),
-                            smoothing_alpha=m["aim_smoothing_alpha"],
-                            per_rule_smooth=per_rule_smooth,
-                        )
-                        error_px = _lock_body_y_axis(error_px, body_y_axis_loose=bool(m["body_y_axis_loose"]))
-                        if m["body_y_axis_loose"]:
-                            per_rule_smooth[m["name"]] = error_px
-                        motion = aim_motion.compute_aim_motion(
-                            error_px,
-                            aim_motion.AimMotionConfig(
-                                aim_strength=m["aim_strength"],
-                                snap_distance=m["snap_distance"],
-                                max_aim_speed_px=m["max_aim_speed_px"],
-                                sens_mult_x=m["sens_mult_x"],
-                                sens_mult_y=m["sens_mult_y"],
-                                noise_px=m["noise_amount"],
-                                curve_points=m["curve_points"],
-                                anti_oscillation_radius_px=m["anti_oscillation_radius_px"],
-                                anti_oscillation_reserve_counts=m["anti_oscillation_reserve_counts"],
-                            ),
-                            limit_error_px=(m["limit_dx"], m["limit_dy"]),
-                        )
-                        motions.append(motion)
-                        if motion.arrived:
-                            per_rule_smooth.pop(m["name"], None)
-                            filtered_error[m["name"]] = None
-                            raw_error_signs[m["name"]] = None
-                            reversal_locks[m["name"]] = 0
-                            pos_smoother.reset(m["name"])
+                    with perf_stats.timer("motion_ms"):
+                        motions: list[aim_motion.AimMotionResult] = []
+                        for m in movement_candidates:
+                            error_px = _smoothed_error_for_rule(
+                                rule_name=m["name"],
+                                error_px=(m["dx"], m["dy"]),
+                                smoothing_alpha=m["aim_smoothing_alpha"],
+                                per_rule_smooth=per_rule_smooth,
+                            )
+                            error_px = _lock_body_y_axis(error_px, body_y_axis_loose=bool(m["body_y_axis_loose"]))
+                            if m["body_y_axis_loose"]:
+                                per_rule_smooth[m["name"]] = error_px
+                            motion = aim_motion.compute_aim_motion(
+                                error_px,
+                                aim_motion.AimMotionConfig(
+                                    aim_strength=m["aim_strength"],
+                                    snap_distance=m["snap_distance"],
+                                    max_aim_speed_px=m["max_aim_speed_px"],
+                                    sens_mult_x=m["sens_mult_x"],
+                                    sens_mult_y=m["sens_mult_y"],
+                                    noise_px=m["noise_amount"],
+                                    curve_points=m["curve_points"],
+                                    anti_oscillation_radius_px=m["anti_oscillation_radius_px"],
+                                    anti_oscillation_reserve_counts=m["anti_oscillation_reserve_counts"],
+                                ),
+                                limit_error_px=(m["limit_dx"], m["limit_dy"]),
+                            )
+                            motions.append(motion)
+                            if motion.arrived:
+                                per_rule_smooth.pop(m["name"], None)
+                                filtered_error[m["name"]] = None
+                                raw_error_signs[m["name"]] = None
+                                reversal_locks[m["name"]] = 0
+                                pos_smoother.reset(m["name"])
                     mdx, mdy = _sum_motion_counts(motions)
                     if mdx or mdy:
-                        vmouse.emit_rel(mdx, mdy)
+                        with perf_stats.timer("input_emit_ms"):
+                            vmouse.emit_rel(mdx, mdy)
 
                 if click_ready:
                     best_click = min(click_ready, key=lambda item: item["d2"])
-                    hold_ms = int(best_click["cfg"]["CLICK_HOLD_MS"])
-                    vmouse.click_once(hold_ms)
+                    hold_ms = int(best_click["hold_ms"])
+                    with perf_stats.timer("input_emit_ms"):
+                        if not input_worker.enqueue_click(hold_ms):
+                            vmouse.click_once(hold_ms)
                     triggered_names = {item["name"] for item in click_ready}
                     for triggered_name in triggered_names:
-                        triggered_cfg = enabled_configs[triggered_name]
-                        base_cooldown = float(triggered_cfg["COOLDOWN_MS"]) / 1000.0
+                        base_cooldown = float(compiled_rules[triggered_name].cooldown_ms) / 1000.0
                         cooldown_until[triggered_name] = best_click["now"] + base_cooldown
                         settle[triggered_name] = 0
+                if perf_stats.enabled:
+                    perf_stats.record_ms("end_to_end_ms", (time.perf_counter_ns() - frame_started_ns) / 1_000_000.0)
 
         except Exception as exc:
             self.status(str(exc), "error")
         finally:
             self._set_overlay_state(False)
+            if perf_stats.enabled:
+                elapsed = max(time.perf_counter() - run_started, 1e-9)
+                perf_stats.record_count("capture_skipped_or_backpressured", grab.buffer.backpressure_count)
+                payload = perf_stats.summary(
+                    extra={
+                        "capture_fps": frames_processed / elapsed,
+                        "frame_count": frames_processed,
+                        "capture_region": capture_region.as_capture_dict(),
+                    },
+                )
+                if perf_output_path:
+                    Path(perf_output_path).parent.mkdir(parents=True, exist_ok=True)
+                    Path(perf_output_path).write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+            if scope_capture is not None:
+                scope_capture.close()
             grab.stop()
             grab.join(timeout=1.0)
+            input_worker.stop(timeout=1.0)
             _safe_stop_listener(key_listener)
             _safe_stop_listener(mouse_listener)
             self._thread = None

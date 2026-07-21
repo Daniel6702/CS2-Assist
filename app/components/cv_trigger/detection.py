@@ -1,6 +1,37 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+
 import numpy as np
+
+
+def scope_corner_patches(frame: np.ndarray, patch_size: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    p = max(4, int(patch_size))
+    h, w = frame.shape[:2]
+    return (
+        frame[0:p, 0:p],
+        frame[0:p, w - p:w],
+        frame[h - p:h, 0:p],
+        frame[h - p:h, w - p:w],
+    )
+
+
+def scope_corner_capture_regions(monitor: Mapping[str, int], patch_size: int) -> tuple[dict[str, int], dict[str, int], dict[str, int], dict[str, int]]:
+    p = max(4, int(patch_size))
+    left = int(monitor.get("left", 0))
+    top = int(monitor.get("top", 0))
+    width = max(1, int(monitor.get("width", 1)))
+    height = max(1, int(monitor.get("height", 1)))
+    patch_width = min(p, width)
+    patch_height = min(p, height)
+    right_left = left + width - patch_width
+    bottom_top = top + height - patch_height
+    return (
+        {"left": left, "top": top, "width": patch_width, "height": patch_height},
+        {"left": right_left, "top": top, "width": patch_width, "height": patch_height},
+        {"left": left, "top": bottom_top, "width": patch_width, "height": patch_height},
+        {"left": right_left, "top": bottom_top, "width": patch_width, "height": patch_height},
+    )
 
 
 class PositionSmoother:
@@ -57,14 +88,9 @@ class ScopeDetector:
         if h < self.patch_size * 2 or w < self.patch_size * 2:
             return self._scoped
 
-        p = self.patch_size
-        patches = [
-            frame[0:p, 0:p],
-            frame[0:p, w - p:w],
-            frame[h - p:h, 0:p],
-            frame[h - p:h, w - p:w],
-        ]
+        return self.update_patches(scope_corner_patches(frame, self.patch_size))
 
+    def update_patches(self, patches: Sequence[np.ndarray]) -> bool:
         dark_corners = 0
         for patch in patches:
             if patch.size == 0:
@@ -86,6 +112,4 @@ class ScopeDetector:
             if self._bright_streak >= self.release_required:
                 self._scoped = False
         return self._scoped
-
-
 
