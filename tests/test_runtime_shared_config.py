@@ -9,11 +9,40 @@ install_mss_stub()
 install_pynput_stub()
 
 from app.components.base import BaseComponent
+from app.components.long_jump import LongJumpComponent
 from app.platform.monitor import MonitorGeometry
 from app.runtime import RuntimeManager
 
 
+class FakeCommandBridge:
+    def __init__(self) -> None:
+        self.commands: list[tuple[int, str]] = []
+
+    def send(self, slot: int, command: str) -> None:
+        self.commands.append((slot, command))
+
+
 class RuntimeSharedConfigTests(unittest.TestCase):
+    def test_runtime_registers_long_jump_component_with_command_bridge(self) -> None:
+        bridge = FakeCommandBridge()
+
+        runtime = RuntimeManager(status_callback=lambda _source, _message: None, command_bridge=bridge)
+
+        self.assertIn("long_jump", runtime.components)
+        self.assertIsInstance(runtime.components["long_jump"], LongJumpComponent)
+
+    def test_long_jump_receives_shared_keyboard_device(self) -> None:
+        runtime = RuntimeManager(status_callback=lambda _source, _message: None, command_bridge=FakeCommandBridge())
+        profile = {
+            "app": {"shared": {"keyboard_device_path": "/dev/input/event9"}},
+            "components": {"long_jump": {"enabled": True, "key_name": "g"}},
+        }
+
+        cfg = runtime._effective_component_config(profile, "long_jump")
+
+        self.assertEqual(cfg["device_path"], "/dev/input/event9")
+        self.assertEqual(cfg["key_name"], "g")
+
     def test_restart_component_restarts_enabled_cv_trigger(self) -> None:
         class RestartProbeComponent(BaseComponent):
             name = "cv_trigger"

@@ -10,6 +10,7 @@ from app.defaults import PROFILES_DIR, default_profile
 
 
 _SAFE_RE = re.compile(r"[^a-zA-Z0-9_-]+")
+_RESERVED_PROFILE_FILES = frozenset({"settings.json"})
 
 
 class ProfileStore:
@@ -27,7 +28,7 @@ class ProfileStore:
         return self.root / f"{safe}.json"
 
     def list_profile_names(self) -> list[str]:
-        names = [path.stem for path in sorted(self.root.glob("*.json"))]
+        names = [path.stem for path in sorted(self.root.glob("*.json")) if path.name not in _RESERVED_PROFILE_FILES]
         return names
 
     def load_profile(self, name: str) -> dict[str, Any]:

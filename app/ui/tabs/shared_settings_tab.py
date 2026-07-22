@@ -10,6 +10,8 @@ from app.ui.tabs.base import BaseTab
 
 
 class SharedSettingsTab(BaseTab):
+    change_game_directory_requested = QtCore.Signal()
+
     def __init__(self, device_service: DeviceService, parent=None) -> None:
         super().__init__(parent)
         self.device_service = device_service
@@ -71,6 +73,11 @@ class SharedSettingsTab(BaseTab):
         display_resolution_layout.addWidget(self.shared_display_height)
         display_resolution_layout.addStretch(1)
         shared_layout.addRow("Display Resolution", display_resolution_row)
+
+        self.change_game_directory_btn = QtWidgets.QPushButton("Change Game Directory...")
+        self.change_game_directory_btn.setToolTip("Select a different Counter-Strike 2 game folder and reinstall cfg files.")
+        self.change_game_directory_btn.clicked.connect(self.change_game_directory_requested)
+        shared_layout.addRow("CS2 Directory", self.change_game_directory_btn)
 
         shared_gsi_row = QtWidgets.QWidget()
         shared_gsi_layout = QtWidgets.QHBoxLayout(shared_gsi_row)

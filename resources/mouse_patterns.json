@@ -1,7 +1,7 @@
 {
     "patterns": {
-        "AK": {
-            "description": "AK pattern.",
+        "weapon_ak47": {
+            "scale": 1.0,
             "steps": [
                 {
                     "dx": -4,
@@ -150,8 +150,8 @@
                 }
             ]
         },
-        "M4A1": {
-            "description": "M4A1 pattern.",
+        "weapon_m4a1_silencer": {
+            "scale": 1.0,
             "steps": [
                 {
                     "dx": 1,
@@ -255,8 +255,8 @@
                 }
             ]
         },
-        "M4A4": {
-            "description": "M4A4 pattern.",
+        "weapon_m4a1": {
+            "scale": 1.0,
             "steps": [
                 {
                     "dx": 2,
@@ -405,8 +405,8 @@
                 }
             ]
         },
-        "Famas": {
-            "description": "Famas pattern.",
+        "weapon_famas": {
+            "scale": 1.0,
             "steps": [
                 {
                     "dx": -4,
@@ -530,8 +530,8 @@
                 }
             ]
         },
-        "Galil": {
-            "description": "Galil pattern.",
+        "weapon_galilar": {
+            "scale": 1.0,
             "steps": [
                 {
                     "dx": 4,
@@ -705,8 +705,8 @@
                 }
             ]
         },
-        "UMP": {
-            "description": "UMP pattern.",
+        "weapon_ump45": {
+            "scale": 1.0,
             "steps": [
                 {
                     "dx": -1,
@@ -830,8 +830,8 @@
                 }
             ]
         },
-        "AUG": {
-            "description": "AUG pattern.",
+        "weapon_aug": {
+            "scale": 1.0,
             "steps": [
                 {
                     "dx": 4,
@@ -950,8 +950,8 @@
                 }
             ]
         },
-        "SG": {
-            "description": "SG pattern.",
+        "weapon_sg556": {
+            "scale": 1.0,
             "steps": [
                 {
                     "dx": -3,

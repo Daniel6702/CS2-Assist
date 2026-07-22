@@ -45,6 +45,14 @@ def component_schemas() -> list[tuple[str, str, list[dict[str, Any]]]]:
             ],
         ),
         (
+            "long_jump",
+            "Long Jump",
+            [
+                {"path": "enabled", "label": "Enabled", "kind": "bool"},
+                {"path": "key_name", "label": "Key", "kind": "line", "default": "g"},
+            ],
+        ),
+        (
             "auto_air_strafe",
             "Auto Air Strafe",
             [

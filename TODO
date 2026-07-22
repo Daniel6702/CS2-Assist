@@ -10,4 +10,8 @@
 
 - Defuse timer. I.e. when Ct start defusing T can tell for how long.
 
-- Auto jump strafing
+- When the player is dead disable CV Aim assist
+
+- Check if aim stregnth and max speed are both necessary.
+
+- The launcher should not say Counter Strike Global Offensive. Just; Counter Strike 2

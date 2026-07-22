@@ -5,3 +5,4 @@ from .cv_trigger import CVTriggerComponent
 from .flash_filter import FlashFilterComponent
 from .jump_throw import JumpThrowComponent
 from .kill_sound import KillSoundComponent
+from .long_jump import LongJumpComponent

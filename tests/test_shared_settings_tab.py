@@ -57,6 +57,15 @@ class SharedSettingsTabTests(unittest.TestCase):
         self.assertFalse(hasattr(tab, "safety_enabled"))
         self.assertNotIn("safety", extracted)
 
+    def test_change_game_directory_button_emits_request(self) -> None:
+        tab = SharedSettingsTab(DeviceService())
+        calls: list[bool] = []
+        tab.change_game_directory_requested.connect(lambda: calls.append(True))
+
+        tab.change_game_directory_btn.click()
+
+        self.assertEqual(calls, [True])
+
 
 if __name__ == "__main__":
     _ = unittest.main()

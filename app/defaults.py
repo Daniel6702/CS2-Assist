@@ -60,6 +60,10 @@ def default_profile() -> dict[str, Any]:
                 "enabled": False,
                 "key_name": "v",
             },
+            "long_jump": {
+                "enabled": False,
+                "key_name": "g",
+            },
             "auto_air_strafe": {
                 "enabled": False,
                 "key_name": "space",

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Final
 
 from PySide6 import QtCore, QtGui, QtWidgets
 
 from app.common import deep_copy, deep_get, deep_set
+from app.cs2_integration.cfg_installer import InvalidGameRootError, cfg_dir_for_game_root, validate_game_root
+from app.cs2_integration.command_bridge import CS2CommandBridge
+from app.cs2_integration.settings import load_settings
 from app.components.pixel_trigger import PixelTriggerComponent
 from app.components.recoil import RecoilComponent
 from app.device_service import DeviceService
@@ -14,6 +18,7 @@ from app.runtime import RuntimeManager
 from app.ui.hotkeys import HotkeyBridge
 from app.ui import styles
 from app.ui.schemas import component_schemas
+from app.ui.setup_dialog import CS2SetupDialog
 from app.ui.tabs import (
     CVTriggerTab,
     LogTab,
@@ -29,7 +34,7 @@ from app.ui.widgets.log_bridge import LogBridge
 
 
 _COMPONENT_SCHEMA_NAMES: Final[frozenset[str]] = frozenset(name for name, _title, _schema in component_schemas())
-_MOVEMENT_COMPONENTS: Final[tuple[str, ...]] = ("bhop", "snap_tap", "counter_strafe", "jump_throw", "auto_air_strafe")
+_MOVEMENT_COMPONENTS: Final[tuple[str, ...]] = ("bhop", "snap_tap", "counter_strafe", "jump_throw", "long_jump", "auto_air_strafe")
 _PIXEL_TRIGGER_SHARED_KEYS: Final[tuple[str, ...]] = (
     "game_resolution",
     "display_resolution",
@@ -84,7 +89,7 @@ def _without_pixel_trigger_shared_keys(config: dict[str, Any]) -> dict[str, Any]
 
 
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self) -> None:
+    def __init__(self, command_bridge: CS2CommandBridge | None = None) -> None:
         app = QtWidgets.QApplication.instance()
         if isinstance(app, QtWidgets.QApplication):
             styles.apply_style(app)
@@ -97,7 +102,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.device_service = DeviceService()
         self.log_bridge = LogBridge()
         self.log_bridge.message.connect(self._append_log)
-        self.runtime = RuntimeManager(status_callback=self._runtime_status)
+        self.command_bridge = command_bridge
+        self.runtime = RuntimeManager(status_callback=self._runtime_status, command_bridge=command_bridge)
         self.hotkeys = HotkeyBridge(self)
         self.hotkeys.activated.connect(self._on_hotkey_activated)
         self.bullet_overlay = BulletImpactOverlay()
@@ -206,6 +212,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.shared_settings_tab.hotkey_movement.editingFinished.connect(self._on_hotkeys_changed)
         self.shared_settings_tab.hotkey_stop_all.editingFinished.connect(self._on_hotkeys_changed)
         self.shared_settings_tab.hotkey_overlay.editingFinished.connect(self._on_hotkeys_changed)
+        self.shared_settings_tab.change_game_directory_requested.connect(self._change_game_directory)
 
         # Connect component config changed signals
         for section in self.movement_tab.sections.values():
@@ -416,6 +423,37 @@ class MainWindow(QtWidgets.QMainWindow):
         self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)
         self._append_log("app", f"Saved profile '{self.current_profile_name}'.")
 
+    def _create_command_bridge_from_settings(self) -> CS2CommandBridge | None:
+        settings = load_settings()
+        if not settings.cs2_game_root:
+            return None
+        root = Path(settings.cs2_game_root)
+        try:
+            validate_game_root(root)
+        except InvalidGameRootError:
+            return None
+        return CS2CommandBridge(cfg_dir_for_game_root(root))
+
+    def _change_game_directory(self) -> None:
+        dialog = CS2SetupDialog(parent=self)
+        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            return
+        new_bridge = self._create_command_bridge_from_settings()
+        if new_bridge is None:
+            self._append_log("app", "[ERROR] CS2 game directory was saved, but the command bridge could not be created.")
+            return
+        long_jump_was_enabled = bool(deep_get(self.current_profile_data, "components.long_jump.enabled", False))
+        if long_jump_was_enabled:
+            self.runtime.components["long_jump"].stop()
+        old_bridge = self.command_bridge
+        self.command_bridge = new_bridge
+        self.runtime.set_command_bridge(new_bridge)
+        if old_bridge is not None:
+            old_bridge.close()
+        if long_jump_was_enabled:
+            self.runtime.restart_component("long_jump", self.current_profile_data)
+        self._append_log("app", "[INFO] CS2 game directory updated.")
+
     def apply_all_runtime(self) -> None:
         self._sync_current_profile_from_widgets()
         self.save_current_profile()
@@ -487,7 +525,7 @@ class MainWindow(QtWidgets.QMainWindow):
         finally:
             self._loading_profile = False
         self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)
-        for name in ("bhop", "snap_tap", "counter_strafe", "auto_air_strafe", "recoil", "pixel_trigger", "cv_trigger"):
+        for name in ("bhop", "snap_tap", "counter_strafe", "long_jump", "auto_air_strafe", "recoil", "pixel_trigger", "cv_trigger"):
             self.runtime.restart_component(name, self.current_profile_data)
 
     def _on_hotkeys_changed(self) -> None:
@@ -661,4 +699,6 @@ class MainWindow(QtWidgets.QMainWindow):
         for component in self.runtime.components.values():
             component.set_status_callback(lambda *_args, **_kwargs: None)
         self.runtime.stop_all()
+        if self.command_bridge is not None:
+            self.command_bridge.close()
         super().closeEvent(event)

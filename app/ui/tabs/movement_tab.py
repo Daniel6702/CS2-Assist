@@ -61,6 +61,7 @@ class MovementTab(BaseTab):
             "snap_tap": _ComponentSection("snap_tap", "Snap Tap / Null Binds", _schema_for("snap_tap"), device_service),
             "counter_strafe": _ComponentSection("counter_strafe", "Counter Strafe", _schema_for("counter_strafe"), device_service),
             "jump_throw": _ComponentSection("jump_throw", "Jump Throw", _schema_for("jump_throw"), device_service),
+            "long_jump": _ComponentSection("long_jump", "Long Jump", _schema_for("long_jump"), device_service),
             "auto_air_strafe": _ComponentSection("auto_air_strafe", "Auto Air Strafe", _schema_for("auto_air_strafe"), device_service),
         }
 
@@ -75,6 +76,7 @@ class MovementTab(BaseTab):
         layout.addWidget(self.sections["counter_strafe"])
 
         layout.addWidget(self.sections["jump_throw"])
+        layout.addWidget(self.sections["long_jump"])
         layout.addWidget(self.sections["auto_air_strafe"])
 
         layout.addStretch(1)

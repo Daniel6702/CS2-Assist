@@ -24,6 +24,7 @@ CS2 Assist provides a GUI for profile-based configuration of these runtime compo
 - Bhop
 - Snap Tap / Null Binds
 - Counter Strafe
+- Long Jump
 - Recoil Control
 - Pixel Trigger
 - CV Trigger / Aim Assist
@@ -36,6 +37,7 @@ The GUI entrypoint is `app/main.py`. It creates a `QApplication`, applies the ap
 - Linux for keyboard filtering and virtual input support
 - Counter-Strike 2
 - CS2 Game State Integration (GSI) if GSI gating or weapon-aware behavior is enabled
+- Write access to CS2's `game/csgo/cfg` folder for first-run setup
 - Permission to read Linux input event devices such as `/dev/input/event*`
 - Permission to create virtual input devices through `uinput`
 
@@ -96,6 +98,8 @@ Run the application from the project root:
 ```bash
 python app/main.py
 ```
+
+On first run, CS2 Assist opens a setup window asking for the CS2 game root folder. Select the root folder that contains `game/csgo/cfg`; the app validates that cfg folder before continuing. Setup installs the bundled GSI file and command bridge cfg files, and creates or appends a managed `autoexec.cfg` include. Steam launch options are not required.
 
 In the GUI:
 
@@ -165,6 +169,19 @@ When GSI is enabled, `RuntimeManager` keeps automation gated until GSI reports t
 
 When GSI is disabled, the runtime gate is opened without waiting for GSI state.
 
+### CS2 cfg setup
+
+The setup window stores the accepted CS2 root in `profiles/settings.json`. Given a root folder, the cfg folder must be at `game/csgo/cfg`.
+
+Setup writes these files into CS2's cfg folder:
+
+- `gamestate_integration_cs2_assist.cfg`: copied from `resources/cfg/gsi.cfg`.
+- `cs2assist_bootstrap.cfg`: binds hidden F13-F24 command slots.
+- `cs2assist_cmd_01.cfg` through `cs2assist_cmd_12.cfg`: command slots written by the app at runtime.
+- `autoexec.cfg`: receives one managed `exec cs2assist_bootstrap` block. If an existing `autoexec.cfg` is modified for the first time, it is backed up as `autoexec.cfg.cs2assist.bak`.
+
+The managed autoexec block is idempotent; running setup again updates the block without duplicating it.
+
 ### Components
 
 Component settings live under `components` in each profile.
@@ -172,6 +189,7 @@ Component settings live under `components` in each profile.
 - `bhop`: Linux keyboard component for space-bar bhop behavior. It uses the configured keyboard device and `tap_interval_ms`.
 - `snap_tap`: Linux keyboard component for W/A/S/D last-key movement behavior.
 - `counter_strafe`: Linux keyboard component with counter-strafe timing settings such as base, full-speed, min/max, shift/ctrl factors, curve, and manual brake windows.
+- `long_jump`: Linux keyboard component that watches the configured key and sends CS2 console commands through the cfg command bridge for the jump/duck long-jump sequence.
 - `recoil`: Mouse recoil control using `resources/mouse_patterns.json`, GSI weapon state when available, sensitivity scaling, movement frequency, axis strength, optional noise, return-mouse behavior, and an optional bullet overlay.
 - `pixel_trigger`: Screen-pixel based trigger component using `mss`, a hold key, color-change threshold, click delay, cooldown, polling interval, monitor index, optional fixed coordinates, debug, and dry-run settings.
 - `cv_trigger`: Computer-vision trigger/aim component using `resources/best.pt`, automatic monitor capture sizing, shared game-resolution settings, target-side settings, inference thresholds, smoothing/prediction values, global anti-oscillation settings, a global aim curve library, and per-rule activation/weapon/target/click settings.
@@ -199,14 +217,15 @@ PYTHONPATH=. python tests/test_runtime_shared_config.py -v
 
 ## Architecture
 
-- `app/main.py`: GUI entrypoint. Creates `QApplication`, applies style, constructs `MainWindow`, and starts the event loop.
+- `app/main.py`: GUI entrypoint. Creates `QApplication`, runs CS2 setup when needed, applies style, constructs `MainWindow`, and starts the event loop.
+- `app/cs2_integration/`: validates CS2 game roots, installs cfg files, stores app-level setup settings, and writes command-slot cfg files for console command execution.
 - `app/ui/main_window.py`: main UI controller. Builds the profile toolbar, tab widget, log view, shared settings tab, GSI tab, and component tabs.
 - `app/runtime.py`: owns `RuntimeManager`, creates component instances, applies profile configuration, starts/stops components, configures GSI, and forwards GSI state.
 - `app/gsi.py`: implements `GSIServer` and `GameState`. The server runs a threaded HTTP listener and handles JSON POST payloads from CS2 GSI.
 - `app/profile_store.py`: implements `ProfileStore` for creating, loading, saving, listing, and deleting JSON profiles.
 - `app/device_service.py`: lists Linux keyboard devices through `evdev` and monitor geometry through `mss`.
 - `app/platform/linux_input.py`: shared Linux keyboard hub built on `evdev` and `uinput`; used by keyboard-filtering components.
-- `app/components/`: component implementations for Bhop, Snap Tap, Counter Strafe, Recoil Control, Pixel Trigger, and CV Trigger.
+- `app/components/`: component implementations for Bhop, Snap Tap, Counter Strafe, Long Jump, Recoil Control, Pixel Trigger, and CV Trigger.
 - `app/ui/tabs/`: Qt tabs for Shared Settings, GSI, and component configuration.
 - `app/ui/widgets/`: reusable widgets such as component editors, CV rule editors, log bridge, collapsible boxes, and bullet overlay.
 
@@ -247,6 +266,14 @@ The GSI tab shows the last state received from the local GSI server. If it stays
 - Confirm nothing else is using the configured port.
 - Apply the profile again and check the log for `GSI listening on http://<host>:<port>` or `Failed to start GSI server`.
 - Remember that when GSI is enabled, features stay gated until GSI reports the player is alive.
+
+### setup says cfg folder not found
+
+The setup window expects the Counter-Strike 2 game root, not the cfg folder itself. The selected folder must contain `game/csgo/cfg`.
+
+### commands or Long Jump do not run in game
+
+Confirm setup completed successfully and that CS2 has loaded `autoexec.cfg`. The cfg folder should contain `cs2assist_bootstrap.cfg` and `cs2assist_cmd_07.cfg`. If CS2 was already running during first setup, restart CS2 so `autoexec.cfg` can execute the managed bootstrap include.
 
 ### model not found
 
