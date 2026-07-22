@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .curve_config import LEGACY_CURVE_MAP, PRESET_CURVES, build_curve_library, legacy_response_curve_to_id
+from .post_shot_y import default_post_shot_y_suppression_config
 from .patterns import _infer_target_type_from_legacy_classes, _truthy
 
 _PRESET_CURVES = PRESET_CURVES
@@ -87,6 +88,7 @@ def _migrate_legacy_config(config: dict[str, Any]) -> dict[str, Any]:
     migrated = dict(config)
     if "aim_curves" not in migrated:
         migrated["aim_curves"] = _build_curve_library()
+    migrated["post_shot_y_suppression"] = _migrate_post_shot_y_suppression(config.get("post_shot_y_suppression"))
 
     if isinstance(config.get("configs"), dict):
         out_configs: dict[str, Any] = {}
@@ -184,3 +186,39 @@ def _migrate_legacy_config(config: dict[str, Any]) -> dict[str, Any]:
     migrated.setdefault("use_gsi_opponent_side", False)
     migrated.setdefault("manual_target_side", "both")
     return migrated
+
+
+def _migrate_post_shot_y_suppression(raw: Any) -> dict[str, bool | int | float]:
+    defaults = default_post_shot_y_suppression_config(enabled=False)
+    if not isinstance(raw, dict):
+        return defaults
+    out = dict(defaults)
+    for key, default in defaults.items():
+        if key not in raw:
+            continue
+        out[key] = _coerce_post_shot_value(raw[key], default)
+    if "stabilization_strength" not in raw and "min_downward_scale" in raw:
+        try:
+            out["stabilization_strength"] = max(0.0, (1.0 - float(raw["min_downward_scale"])) / 0.98)
+        except (TypeError, ValueError):
+            out["stabilization_strength"] = defaults["stabilization_strength"]
+    if "stabilization_strength" not in raw and "downward_reduction" in raw:
+        try:
+            out["stabilization_strength"] = max(0.0, float(raw["downward_reduction"]) / 0.98)
+        except (TypeError, ValueError):
+            out["stabilization_strength"] = defaults["stabilization_strength"]
+    return out
+
+
+def _coerce_post_shot_value(value: Any, default: bool | int | float) -> bool | int | float:
+    if isinstance(default, bool):
+        return _truthy(value)
+    if isinstance(default, int):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default

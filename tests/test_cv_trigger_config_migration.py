@@ -5,6 +5,10 @@ import unittest
 from pathlib import Path
 from typing import Any
 
+from tests.optional_dependency_stubs import install_mss_stub
+
+install_mss_stub()
+
 from app.components.cv_trigger.migration import (
     _PRESET_CURVES,
     _build_curve_library,
@@ -384,6 +388,49 @@ class MigrateLegacyConfigTests(unittest.TestCase):
         self.assertEqual(result["configs"], {})
         self.assertIn("aim_curves", result)
 
+    def test_missing_post_shot_y_suppression_defaults_disabled(self) -> None:
+        result = _migrate_legacy_config({"configs": {}})
+
+        post_shot = result["post_shot_y_suppression"]
+        self.assertFalse(post_shot["enabled"])
+        self.assertEqual(post_shot["stabilization_strength"], 1.0)
+        self.assertEqual(post_shot["horizontal_stabilization_strength"], 0.5)
+        self.assertEqual(post_shot["manual_release_max_hold_ms"], 300)
+        self.assertEqual(
+            set(post_shot),
+            {"enabled", "stabilization_strength", "horizontal_stabilization_strength", "manual_release_max_hold_ms"},
+        )
+
+    def test_explicit_post_shot_y_suppression_values_are_preserved(self) -> None:
+        result = _migrate_legacy_config({
+            "configs": {},
+            "post_shot_y_suppression": {
+                "enabled": True,
+                "stabilization_strength": 1.25,
+                "manual_release_max_hold_ms": 450,
+            },
+        })
+
+        post_shot = result["post_shot_y_suppression"]
+        self.assertTrue(post_shot["enabled"])
+        self.assertEqual(post_shot["stabilization_strength"], 1.25)
+        self.assertEqual(post_shot["manual_release_max_hold_ms"], 450)
+
+    def test_legacy_post_shot_internal_values_fold_into_simple_controls(self) -> None:
+        result = _migrate_legacy_config({
+            "configs": {},
+            "post_shot_y_suppression": {
+                "enabled": True,
+                "min_downward_scale": 0.25,
+                "fallback_hold_ms": 80,
+                "fallback_restore_ms": 120,
+            },
+        })
+
+        post_shot = result["post_shot_y_suppression"]
+        self.assertTrue(post_shot["enabled"])
+        self.assertAlmostEqual(post_shot["stabilization_strength"], 0.75 / 0.98)
+
     def test_stale_state_missing_raw_item(self) -> None:
         config = {"configs": {"test": None}}
         result = _migrate_legacy_config(config)
@@ -424,6 +471,18 @@ class DefaultProfileCanonicalTests(unittest.TestCase):
         self.assertIn("aim_curves", cv)
         self.assertIn("linear", cv["aim_curves"])
         self.assertIn("exponential", cv["aim_curves"])
+
+    def test_default_post_shot_y_suppression_is_disabled_and_tunable(self) -> None:
+        post_shot = default_profile()["components"]["cv_trigger"]["post_shot_y_suppression"]
+
+        self.assertFalse(post_shot["enabled"])
+        self.assertEqual(post_shot["stabilization_strength"], 1.0)
+        self.assertEqual(post_shot["horizontal_stabilization_strength"], 0.5)
+        self.assertEqual(post_shot["manual_release_max_hold_ms"], 300)
+        self.assertEqual(
+            set(post_shot),
+            {"enabled", "stabilization_strength", "horizontal_stabilization_strength", "manual_release_max_hold_ms"},
+        )
 
     def test_default_rules_have_scalar_aim_strength(self) -> None:
         cv = default_profile()["components"]["cv_trigger"]

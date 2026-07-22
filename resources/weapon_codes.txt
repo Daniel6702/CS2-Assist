@@ -10,3 +10,4 @@ weapon_nova
 weapon_fiveseven
 weapon_usp_silencer
 weapon_elite
+weapon_mag7

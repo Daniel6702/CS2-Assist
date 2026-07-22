@@ -7,15 +7,23 @@ from typing import Any
 
 _ = os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6 import QtWidgets  # noqa: E402
+try:
+    from PySide6 import QtWidgets  # noqa: E402
+except ImportError as exc:
+    QtWidgets = None
+    QT_IMPORT_ERROR = exc
+else:
+    QT_IMPORT_ERROR = None
 
-app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
+app = None if QtWidgets is None else QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
 
-from app.device_service import DeviceService  # noqa: E402
-from app.ui.widgets.cv_trigger_editor import CVTriggerEditor, _normalize_cv_trigger_config_for_ui  # noqa: E402
+if QtWidgets is not None:
+    from app.device_service import DeviceService  # noqa: E402
+    from app.ui.widgets.cv_trigger_editor import CVTriggerEditor, _normalize_cv_trigger_config_for_ui  # noqa: E402
 
 
 def _make_editor() -> CVTriggerEditor:
+    assert QtWidgets is not None
     return CVTriggerEditor("cv_trigger", "CV Trigger", device_service=DeviceService())
 
 
@@ -38,6 +46,7 @@ def _base_config() -> dict[str, Any]:
     }
 
 
+@unittest.skipIf(QT_IMPORT_ERROR is not None, f"PySide6 is unavailable: {QT_IMPORT_ERROR}")
 class RoundTripTests(unittest.TestCase):
     def test_multiple_curves_round_trip(self) -> None:
         curves = {
@@ -83,6 +92,7 @@ class RoundTripTests(unittest.TestCase):
             self.assertIsInstance(pt[1], float)
 
 
+@unittest.skipIf(QT_IMPORT_ERROR is not None, f"PySide6 is unavailable: {QT_IMPORT_ERROR}")
 class NormalizeTests(unittest.TestCase):
     def test_missing_aim_curves_normalizes_to_templates(self) -> None:
         cfg = _normalize_cv_trigger_config_for_ui({"configs": {}})
@@ -123,6 +133,7 @@ class NormalizeTests(unittest.TestCase):
         self.assertIn("linear", cfg["aim_curves"])
 
 
+@unittest.skipIf(QT_IMPORT_ERROR is not None, f"PySide6 is unavailable: {QT_IMPORT_ERROR}")
 class SignalTests(unittest.TestCase):
     def test_curve_editor_mutation_emits_config_changed(self) -> None:
         editor = _make_editor()
@@ -135,6 +146,7 @@ class SignalTests(unittest.TestCase):
         self.assertEqual(received[0][0], "cv_trigger")
 
 
+@unittest.skipIf(QT_IMPORT_ERROR is not None, f"PySide6 is unavailable: {QT_IMPORT_ERROR}")
 class PreservesExistingTests(unittest.TestCase):
     def test_existing_rules_preserved(self) -> None:
         config = _base_config()

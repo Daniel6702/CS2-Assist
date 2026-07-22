@@ -7,13 +7,20 @@ from typing import Any
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6 import QtWidgets  # noqa: E402
+try:
+    from PySide6 import QtWidgets  # noqa: E402
+except ImportError as exc:
+    QtWidgets = None
+    QT_IMPORT_ERROR = exc
+else:
+    QT_IMPORT_ERROR = None
 
-app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
+app = None if QtWidgets is None else QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
 
-from app.device_service import DeviceService  # noqa: E402
-from app.ui.widgets.cv_rule_editor import CVRuleEditor  # noqa: E402
-from app.ui.widgets.cv_trigger_editor import CVTriggerEditor  # noqa: E402
+if QtWidgets is not None:
+    from app.device_service import DeviceService  # noqa: E402
+    from app.ui.widgets.cv_rule_editor import CVRuleEditor  # noqa: E402
+    from app.ui.widgets.cv_trigger_editor import CVTriggerEditor  # noqa: E402
 
 
 LEGACY_KEYS = {
@@ -26,6 +33,7 @@ LEGACY_KEYS = {
 
 
 def _rule_editor() -> CVRuleEditor:
+    assert QtWidgets is not None
     editor = CVRuleEditor()
     editor.set_available_curves({
         "linear": {"label": "Linear", "points": [[0.0, 0.0], [1.0, 1.0]]},
@@ -56,6 +64,7 @@ def _canonical_rule() -> dict[str, Any]:
     }
 
 
+@unittest.skipIf(QT_IMPORT_ERROR is not None, f"PySide6 is unavailable: {QT_IMPORT_ERROR}")
 class CVRuleEditorCanonicalTests(unittest.TestCase):
     def test_extract_rule_outputs_canonical_aim_keys(self) -> None:
         editor = _rule_editor()
@@ -116,6 +125,7 @@ class CVRuleEditorCanonicalTests(unittest.TestCase):
         self.assertEqual(editor.extract_rule()[1]["priority"], 0)
 
 
+@unittest.skipIf(QT_IMPORT_ERROR is not None, f"PySide6 is unavailable: {QT_IMPORT_ERROR}")
 class CVTriggerEditorCurveIntegrationTests(unittest.TestCase):
     def test_runtime_status_is_limited_to_lifecycle_labels(self) -> None:
         editor = CVTriggerEditor("cv_trigger", "CV Trigger", device_service=DeviceService())

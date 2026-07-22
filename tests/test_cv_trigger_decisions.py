@@ -1,6 +1,10 @@
 import unittest
 from pathlib import Path
 
+from tests.optional_dependency_stubs import install_mss_stub
+
+install_mss_stub()
+
 from app.components.cv_trigger.core import (
     _aim_point_for_box,
     _anti_oscillation_reversal_lock_frames,

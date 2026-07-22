@@ -4,6 +4,7 @@ from typing import Any
 
 from PySide6 import QtCore, QtWidgets
 
+from app.components.cv_trigger.post_shot_y import default_post_shot_y_suppression_config, post_shot_config_from_mapping
 from app.device_service import DeviceService
 
 from .curve_editor import AimCurveEditor, load_curves
@@ -28,6 +29,18 @@ def _normalize_cv_trigger_config_for_ui(config: dict[str, Any]) -> dict[str, Any
 
     cfg.setdefault("use_gsi_opponent_side", False)
     cfg.setdefault("manual_target_side", "both")
+    raw_post_shot = cfg.get("post_shot_y_suppression")
+    if isinstance(raw_post_shot, dict):
+        parsed_post_shot = post_shot_config_from_mapping(raw_post_shot)
+        post_shot = {
+            "enabled": parsed_post_shot.enabled,
+            "stabilization_strength": parsed_post_shot.stabilization_strength,
+            "horizontal_stabilization_strength": parsed_post_shot.horizontal_stabilization_strength,
+            "manual_release_max_hold_ms": parsed_post_shot.manual_release_max_hold_ms,
+        }
+    else:
+        post_shot = dict(default_post_shot_y_suppression_config(enabled=False))
+    cfg["post_shot_y_suppression"] = post_shot
 
     cfg["aim_curves"] = load_curves(cfg.get("aim_curves"))
 
@@ -223,6 +236,46 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         self.anti_oscillation_lock_frames.valueChanged.connect(self._emit_change)
         anti_oscillation_form.addRow("Reversal lock frames", self.anti_oscillation_lock_frames)
 
+        post_shot_group = QtWidgets.QGroupBox("Post-Shot Stabilization")
+        post_shot_form = QtWidgets.QFormLayout(post_shot_group)
+        post_shot_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+        post_shot_form.setHorizontalSpacing(12)
+        post_shot_form.setVerticalSpacing(6)
+        left_column.addWidget(post_shot_group)
+
+        self.post_shot_y_enabled = QtWidgets.QCheckBox()
+        self.post_shot_y_enabled.setToolTip("Rollback switch. When off, CV aim movement behaves as before.")
+        self.post_shot_y_enabled.stateChanged.connect(self._emit_change)
+        post_shot_form.addRow("Enable Y guard", self.post_shot_y_enabled)
+
+        self.post_shot_y_stabilization_strength = QtWidgets.QDoubleSpinBox()
+        self.post_shot_y_stabilization_strength.setRange(0.0, 1000.0)
+        self.post_shot_y_stabilization_strength.setDecimals(1)
+        self.post_shot_y_stabilization_strength.setSingleStep(5.0)
+        self.post_shot_y_stabilization_strength.setSuffix(" %")
+        self.post_shot_y_stabilization_strength.setToolTip("Scales downward Y blocking and weapon-based recovery time. Raise it if shots still dip below target.")
+        self.post_shot_y_stabilization_strength.valueChanged.connect(self._emit_change)
+        post_shot_form.addRow("Vertical strength", self.post_shot_y_stabilization_strength)
+
+        self.post_shot_x_stabilization_strength = QtWidgets.QDoubleSpinBox()
+        self.post_shot_x_stabilization_strength.setRange(0.0, 1000.0)
+        self.post_shot_x_stabilization_strength.setDecimals(1)
+        self.post_shot_x_stabilization_strength.setSingleStep(5.0)
+        self.post_shot_x_stabilization_strength.setSuffix(" %")
+        self.post_shot_x_stabilization_strength.setToolTip("Scales horizontal X reduction during the same weapon-based recovery window. Lower values keep more sideways aim assist.")
+        self.post_shot_x_stabilization_strength.valueChanged.connect(self._emit_change)
+        post_shot_form.addRow("Horizontal strength", self.post_shot_x_stabilization_strength)
+
+        self.post_shot_manual_release_max_hold_ms = QtWidgets.QSpinBox()
+        self.post_shot_manual_release_max_hold_ms.setRange(0, 5000)
+        self.post_shot_manual_release_max_hold_ms.setSingleStep(25)
+        self.post_shot_manual_release_max_hold_ms.setSuffix(" ms")
+        self.post_shot_manual_release_max_hold_ms.setToolTip(
+            "Manual left-click releases held longer than this are treated as sprays and will not start stabilization."
+        )
+        self.post_shot_manual_release_max_hold_ms.valueChanged.connect(self._emit_change)
+        post_shot_form.addRow("Max tap hold", self.post_shot_manual_release_max_hold_ms)
+
         # ── Right column: Aim Motion Curves ────────────────────────────
         aim_curve_group = QtWidgets.QGroupBox("Aim Motion Curves")
         aim_curve_layout = QtWidgets.QVBoxLayout(aim_curve_group)
@@ -315,6 +368,11 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
             self.anti_oscillation_radius_px.setValue(float(data.get("anti_oscillation_radius_px", 24.0) or 0.0))
             self.anti_oscillation_reserve_counts.setValue(int(data.get("anti_oscillation_reserve_counts", 1) or 0))
             self.anti_oscillation_lock_frames.setValue(int(data.get("anti_oscillation_lock_frames", 2) or 0))
+            post_shot = dict(data.get("post_shot_y_suppression", default_post_shot_y_suppression_config(enabled=False)))
+            self.post_shot_y_enabled.setChecked(bool(post_shot.get("enabled", False)))
+            self.post_shot_y_stabilization_strength.setValue(float(post_shot.get("stabilization_strength", 1.0)) * 100.0)
+            self.post_shot_x_stabilization_strength.setValue(float(post_shot.get("horizontal_stabilization_strength", 0.5)) * 100.0)
+            self.post_shot_manual_release_max_hold_ms.setValue(int(post_shot.get("manual_release_max_hold_ms", 300)))
             self.aim_curve_editor.load_curves(load_curves(data.get("aim_curves")))
             self._clear_rules()
             configs = dict(data.get("configs", {}))
@@ -370,6 +428,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
             "anti_oscillation_radius_px": self.anti_oscillation_radius_px.value(),
             "anti_oscillation_reserve_counts": self.anti_oscillation_reserve_counts.value(),
             "anti_oscillation_lock_frames": self.anti_oscillation_lock_frames.value(),
+            "post_shot_y_suppression": self._extract_post_shot_y_suppression(),
             "configs": {},
         }
 
@@ -457,3 +516,11 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         except Exception:
             return
         self.config_changed.emit(self.component_name, cfg)
+
+    def _extract_post_shot_y_suppression(self) -> dict[str, bool | int | float]:
+        return {
+            "enabled": self.post_shot_y_enabled.isChecked(),
+            "stabilization_strength": self.post_shot_y_stabilization_strength.value() / 100.0,
+            "horizontal_stabilization_strength": self.post_shot_x_stabilization_strength.value() / 100.0,
+            "manual_release_max_hold_ms": self.post_shot_manual_release_max_hold_ms.value(),
+        }

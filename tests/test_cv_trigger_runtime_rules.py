@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import unittest
 
+from tests.optional_dependency_stubs import install_mss_stub
+
+install_mss_stub()
+
 from app.components.cv_trigger.curve_config import build_curve_library
 from app.components.cv_trigger.runtime_rules import compile_rules, highest_priority_rules
 

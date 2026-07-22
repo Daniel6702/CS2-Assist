@@ -5,17 +5,26 @@ import sys
 import time
 import unittest
 
+from tests.optional_dependency_stubs import install_mss_stub, install_pynput_stub
+
+install_mss_stub()
+install_pynput_stub()
+
 _ = os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6 import QtWidgets  # noqa: E402
+try:
+    from PySide6 import QtWidgets  # noqa: E402
+except ImportError:
+    QtWidgets = None
 
-app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
+app = None if QtWidgets is None else QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
 
 from app.components.auto_shoot import AutoShootComponent  # noqa: E402
 from app.defaults import default_profile  # noqa: E402
 from app.gsi import GameState  # noqa: E402
 from app.runtime import RuntimeManager  # noqa: E402
-from app.ui.tabs.misc_tab import MiscTab  # noqa: E402
+if QtWidgets is not None:
+    from app.ui.tabs.misc_tab import MiscTab  # noqa: E402
 
 
 class FakeClicker:
@@ -165,6 +174,8 @@ class AutoShootWiringTests(unittest.TestCase):
         )
 
     def test_misc_tab_round_trips_auto_shoot_config(self) -> None:
+        if QtWidgets is None:
+            self.skipTest("PySide6 is unavailable")
         tab = MiscTab()
         try:
             tab.load_config(

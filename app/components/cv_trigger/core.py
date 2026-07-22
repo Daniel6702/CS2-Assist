@@ -24,6 +24,15 @@ from .inference import InferenceConfig, UltralyticsInferenceEngine
 from .input_worker import InputWorker
 from .metrics import CVPerfStats
 from .migration import _migrate_legacy_config
+from .post_shot_y import (
+    ConfirmedShotEvent,
+    PostShotYSuppression,
+    ShotEventTracker,
+    ShotStartEvent,
+    clamp_positive_y_to_limit,
+    clamp_x_to_limit,
+    post_shot_config_from_mapping,
+)
 from .roi import CaptureRegion, compute_center_roi
 from .runtime_rules import compile_rules, highest_priority_rules
 from .patterns import (
@@ -36,6 +45,7 @@ from .patterns import (
 )
 from .postprocess import extract_filtered_detections
 from .virtual_mouse import VirtualMouse
+from .weapon_recoil import load_weapon_recoil_table, weapon_recoil_info
 
 
 def _safe_stop_listener(listener: Any) -> None:
@@ -249,6 +259,11 @@ def _capture_region_for_config(
     )
 
 
+def _should_note_manual_release_candidate(*, pressed_at: float, released_at: float, max_hold_seconds: float) -> bool:
+    held_seconds = released_at - pressed_at
+    return 0.0 <= held_seconds <= max_hold_seconds
+
+
 class CVTriggerComponent(BaseComponent):
     name = "cv_trigger"
 
@@ -265,6 +280,10 @@ class CVTriggerComponent(BaseComponent):
         self._current_player_side: str | None = None
         self._last_kills: int | None = None
         self._pending_kill_event: bool = False
+        self._post_shot_config = post_shot_config_from_mapping(None)
+        self._shot_tracker = ShotEventTracker(self._post_shot_config)
+        self._post_shot_events: list[ShotStartEvent | ConfirmedShotEvent] = []
+        self._post_shot_reset_pending = False
         self._overlay_lock = threading.RLock()
         self._overlay_active = False
         self._overlay_offset_x = 0.0
@@ -272,7 +291,17 @@ class CVTriggerComponent(BaseComponent):
         self._overlay_rule_name: str | None = None
 
     def configure(self, config: dict[str, Any]) -> None:
-        super().configure(_migrate_legacy_config(config))
+        migrated = _migrate_legacy_config(config)
+        super().configure(migrated)
+        self._configure_post_shot_state(migrated)
+
+    def _configure_post_shot_state(self, config: dict[str, Any]) -> None:
+        post_shot_config = post_shot_config_from_mapping(config.get("post_shot_y_suppression"))
+        with self._gsi_lock:
+            self._post_shot_config = post_shot_config
+            self._shot_tracker = ShotEventTracker(post_shot_config)
+            self._post_shot_events.clear()
+            self._post_shot_reset_pending = True
 
     def on_gsi_state(self, state: GameState) -> None:
         now = time.perf_counter()
@@ -287,6 +316,21 @@ class CVTriggerComponent(BaseComponent):
                 new_shots_fired = None
             else:
                 new_shots_fired = max(0, int(state.ammo_clip_max) - int(state.ammo_clip))
+
+            if self._post_shot_config.enabled:
+                recoil_state = self._runtime_recoil_alignment_state()
+                recoil_active = bool(recoil_state is not None and recoil_state.get("active", False))
+                update = self._shot_tracker.update_gsi_weapon_ammo(
+                    state.current_weapon,
+                    state.ammo_clip,
+                    state.ammo_clip_max,
+                    now,
+                    recoil_active=recoil_active,
+                )
+                if update.cancel_provisional:
+                    self._post_shot_reset_pending = True
+                if update.confirmed is not None and update.should_start_suppression:
+                    self._post_shot_events.append(update.confirmed)
 
             if weapon_changed or new_shots_fired != self._shots_fired:
                 self._last_shots_change_at = now
@@ -306,6 +350,38 @@ class CVTriggerComponent(BaseComponent):
                 self._pending_kill_event = False
                 return True
             return False
+
+    def _note_post_shot_manual_candidate(self) -> None:
+        with self._gsi_lock:
+            if not self._post_shot_config.enabled:
+                return
+            event = self._shot_tracker.note_manual_press(self._current_weapon, time.perf_counter())
+            self._post_shot_events.append(event)
+
+    def _note_post_shot_cv_auto_candidate(self) -> None:
+        with self._gsi_lock:
+            if not self._post_shot_config.enabled:
+                return
+            event = self._shot_tracker.note_cv_auto_click(self._current_weapon, time.perf_counter())
+            self._post_shot_events.append(event)
+
+    def _consume_post_shot_updates(self) -> tuple[list[ShotStartEvent | ConfirmedShotEvent], bool]:
+        with self._gsi_lock:
+            events = list(self._post_shot_events)
+            self._post_shot_events.clear()
+            reset_pending = self._post_shot_reset_pending
+            self._post_shot_reset_pending = False
+            return events, reset_pending
+
+    def _reset_post_shot_state(self) -> None:
+        with self._gsi_lock:
+            self._shot_tracker.reset()
+            self._post_shot_events.clear()
+            self._post_shot_reset_pending = True
+
+    def on_runtime_gate_changed(self, open_: bool, reason: str) -> None:
+        if not open_:
+            self._reset_post_shot_state()
 
     def _current_weapon_name(self) -> str | None:
         with self._gsi_lock:
@@ -505,6 +581,7 @@ class CVTriggerComponent(BaseComponent):
     def stop(self) -> None:
         super().stop()
         self._stop.set()
+        self._reset_post_shot_state()
         thread = self._thread
         if thread is not None and thread.is_alive() and thread is not threading.current_thread():
             thread.join(timeout=2.0)
@@ -543,7 +620,10 @@ class CVTriggerComponent(BaseComponent):
         compiled_rules = compile_rules(enabled_configs, aim_curves)
 
         pattern_file = _load_pattern_file(PATTERNS_FILE)
+        weapon_recoil_table = load_weapon_recoil_table()
         recoil_sync = dict(config.get("recoil_sync", {}) or {})
+        post_shot_config = post_shot_config_from_mapping(config.get("post_shot_y_suppression"))
+        post_shot_suppressor = PostShotYSuppression(post_shot_config)
         inference_confidence = float(config.get("inference_confidence", 0.15) or 0.15)
         inference_img_size = int(config.get("inference_img_size", 384) or 384)
         jitter_deadzone_px = float(config.get("jitter_deadzone_px", 2.0) or 2.0)
@@ -610,6 +690,8 @@ class CVTriggerComponent(BaseComponent):
         per_rule_smooth: dict[str, tuple[float, float] | None] = {}
 
         activation = ActivationState()
+        left_pressed_at: float | None = None
+        manual_release_max_hold_seconds = post_shot_config.manual_release_max_hold_ms / 1000.0
 
         def on_press(key, *args) -> None:
             activation.press_key(key_to_name(key))
@@ -618,10 +700,22 @@ class CVTriggerComponent(BaseComponent):
             activation.release_key(key_to_name(key))
 
         def on_click(x, y, button, pressed, *args) -> None:
+            nonlocal left_pressed_at
             name = button_to_name(button)
             if pressed:
                 activation.press_button(name)
+                if name == "left":
+                    left_pressed_at = time.perf_counter()
             else:
+                if name == "left" and left_pressed_at is not None:
+                    released_at = time.perf_counter()
+                    if _should_note_manual_release_candidate(
+                        pressed_at=left_pressed_at,
+                        released_at=released_at,
+                        max_hold_seconds=manual_release_max_hold_seconds,
+                    ):
+                        self._note_post_shot_manual_candidate()
+                    left_pressed_at = None
                 activation.release_button(name)
 
         key_listener = keyboard.Listener(on_press=on_press, on_release=on_release)
@@ -660,8 +754,8 @@ class CVTriggerComponent(BaseComponent):
                 frame_started_ns = time.perf_counter_ns()
                 frames_processed += 1
                 frame = frame_info.data
+                frame_age_ms = (frame_started_ns - frame_info.captured_at_ns) / 1_000_000.0
                 if perf_stats.enabled:
-                    frame_age_ms = (frame_started_ns - frame_info.captured_at_ns) / 1_000_000.0
                     perf_stats.record_ms("frame_age_ms", frame_age_ms)
                 with perf_stats.timer("preprocess_ms"):
                     pass
@@ -677,10 +771,38 @@ class CVTriggerComponent(BaseComponent):
                     pos_smoother.reset_many(settle.keys())
                     previous_active = ()
                     self._set_overlay_state(False)
+                    post_shot_suppressor.reset()
                     time.sleep(0.01)
                     if perf_stats.enabled:
                         perf_stats.record_ms("end_to_end_ms", (time.perf_counter_ns() - frame_started_ns) / 1_000_000.0)
                     continue
+
+                if (
+                    post_shot_config.enabled
+                    and post_shot_config.max_frame_age_ms > 0
+                    and frame_age_ms > post_shot_config.max_frame_age_ms
+                ):
+                    post_shot_suppressor.reset()
+                    per_rule_smooth.clear()
+                    for name in settle:
+                        settle[name] = 0
+                        filtered_error[name] = None
+                        raw_error_signs[name] = None
+                        reversal_locks[name] = 0
+                    pos_smoother.reset_many(settle.keys())
+                    self._set_overlay_state(False)
+                    if perf_stats.enabled:
+                        perf_stats.record_ms("end_to_end_ms", (time.perf_counter_ns() - frame_started_ns) / 1_000_000.0)
+                    continue
+
+                post_shot_events, post_shot_reset = self._consume_post_shot_updates()
+                if post_shot_reset:
+                    post_shot_suppressor.reset()
+                for post_shot_event in post_shot_events:
+                    post_shot_suppressor.start(
+                        post_shot_event,
+                        weapon_recoil_info(weapon_recoil_table, post_shot_event.weapon),
+                    )
 
                 with perf_stats.timer("rule_select_ms"):
                     current_weapon = self._current_weapon_name()
@@ -730,6 +852,8 @@ class CVTriggerComponent(BaseComponent):
 
                 if not active_names:
                     self._set_overlay_state(False)
+                    if post_shot_config.enabled:
+                        post_shot_suppressor.note_target_missing(time.perf_counter())
                     if perf_stats.enabled:
                         perf_stats.record_ms("end_to_end_ms", (time.perf_counter_ns() - frame_started_ns) / 1_000_000.0)
                     continue
@@ -756,6 +880,7 @@ class CVTriggerComponent(BaseComponent):
                         filtered_error[name] = None
                         raw_error_signs[name] = None
                         reversal_locks[name] = 0
+                    post_shot_suppressor.reset()
                     self._set_overlay_state(False)
                     if perf_stats.enabled:
                         perf_stats.record_ms("end_to_end_ms", (time.perf_counter_ns() - frame_started_ns) / 1_000_000.0)
@@ -776,6 +901,9 @@ class CVTriggerComponent(BaseComponent):
                     perf_stats.record_count("selected_boxes_count", extracted.selected_count)
 
                 overlay_set = False
+                post_shot_target_seen = False
+                post_shot_recoil_state = self._runtime_recoil_alignment_state() if post_shot_config.enabled else None
+                post_shot_recoil_active = bool(post_shot_recoil_state is not None and post_shot_recoil_state.get("active", False))
                 movement_candidates: list[dict[str, Any]] = []
                 click_ready: list[dict[str, Any]] = []
                 base_sens_mult_x = round((game_width / mon_width) / max(user_sens, 1e-6), 4)
@@ -912,6 +1040,7 @@ class CVTriggerComponent(BaseComponent):
                             continue
 
                         if best_movement is not None:
+                            post_shot_target_seen = True
                             raw_tx = float(best_movement["target_tx"])
                             raw_ty = float(best_movement["target_ty"])
                             # Smooth raw detections to dampen YOLO bounding-box jitter
@@ -987,6 +1116,26 @@ class CVTriggerComponent(BaseComponent):
                                 body_y_axis_loose=bool(best_movement["body_y_axis_loose"]),
                             )
 
+                            post_shot_x_limit: float | None = None
+                            post_shot_y_limit: float | None = None
+                            if post_shot_config.enabled and filt_dx != 0.0:
+                                suppressed_filt_dx = post_shot_suppressor.apply_x(
+                                    filt_dx,
+                                    now=time.perf_counter(),
+                                )
+                                if suppressed_filt_dx != filt_dx:
+                                    post_shot_x_limit = suppressed_filt_dx
+                                    filt_dx = suppressed_filt_dx
+                            if post_shot_config.enabled and filt_dy > 0.0:
+                                suppressed_filt_dy = post_shot_suppressor.apply_y(
+                                    filt_dy,
+                                    now=time.perf_counter(),
+                                    recoil_active=post_shot_recoil_active,
+                                )
+                                if suppressed_filt_dy < filt_dy:
+                                    post_shot_y_limit = suppressed_filt_dy
+                                    filt_dy = suppressed_filt_dy
+
                             filtered_error[name] = (filt_dx, filt_dy)
                             if now >= aim_cooldown_until.get(name, 0.0):
                                 movement_candidates.append({
@@ -1009,6 +1158,8 @@ class CVTriggerComponent(BaseComponent):
                                     "anti_oscillation_radius_px": anti_oscillation_radius_px,
                                     "anti_oscillation_reserve_counts": anti_oscillation_reserve_counts,
                                     "body_y_axis_loose": best_movement["body_y_axis_loose"],
+                                    "post_shot_x_limit": post_shot_x_limit,
+                                    "post_shot_y_limit": post_shot_y_limit,
                                 })
                         else:
                             filtered_error[name] = None
@@ -1036,6 +1187,12 @@ class CVTriggerComponent(BaseComponent):
                 if not overlay_set:
                     self._set_overlay_state(False)
 
+                if post_shot_config.enabled:
+                    if post_shot_target_seen:
+                        post_shot_suppressor.note_target_visible()
+                    else:
+                        post_shot_suppressor.note_target_missing(time.perf_counter())
+
                 if not movement_candidates and not click_ready:
                     if perf_stats.enabled:
                         perf_stats.record_ms("end_to_end_ms", (time.perf_counter_ns() - frame_started_ns) / 1_000_000.0)
@@ -1051,6 +1208,20 @@ class CVTriggerComponent(BaseComponent):
                                 smoothing_alpha=m["aim_smoothing_alpha"],
                                 per_rule_smooth=per_rule_smooth,
                             )
+                            post_shot_x_limit = m.get("post_shot_x_limit")
+                            post_shot_y_limit = m.get("post_shot_y_limit")
+                            if isinstance(post_shot_x_limit, float):
+                                error_px = (
+                                    clamp_x_to_limit(error_px[0], post_shot_x_limit),
+                                    error_px[1],
+                                )
+                                per_rule_smooth[m["name"]] = error_px
+                            if isinstance(post_shot_y_limit, float):
+                                error_px = (
+                                    error_px[0],
+                                    clamp_positive_y_to_limit(error_px[1], post_shot_y_limit),
+                                )
+                                per_rule_smooth[m["name"]] = error_px
                             error_px = _lock_body_y_axis(error_px, body_y_axis_loose=bool(m["body_y_axis_loose"]))
                             if m["body_y_axis_loose"]:
                                 per_rule_smooth[m["name"]] = error_px
@@ -1085,6 +1256,7 @@ class CVTriggerComponent(BaseComponent):
                     best_click = min(click_ready, key=lambda item: item["d2"])
                     hold_ms = int(best_click["hold_ms"])
                     with perf_stats.timer("input_emit_ms"):
+                        self._note_post_shot_cv_auto_candidate()
                         if not input_worker.enqueue_click(hold_ms):
                             vmouse.click_once(hold_ms)
                     triggered_names = {item["name"] for item in click_ready}

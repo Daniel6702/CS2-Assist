@@ -1,5 +1,9 @@
 import unittest
 
+from tests.optional_dependency_stubs import install_mss_stub
+
+install_mss_stub()
+
 from app.components.cv_trigger.aim_motion import (
     AimMotionConfig,
     compute_aim_motion,

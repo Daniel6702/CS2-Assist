@@ -3,6 +3,11 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+from tests.optional_dependency_stubs import install_mss_stub, install_pynput_stub
+
+install_mss_stub()
+install_pynput_stub()
+
 from app.components.base import BaseComponent
 from app.platform.monitor import MonitorGeometry
 from app.runtime import RuntimeManager

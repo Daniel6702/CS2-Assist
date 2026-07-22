@@ -296,6 +296,23 @@
                             0.0
                         ]
                     ]
+                },
+                "shotgun": {
+                    "label": "Shotgun",
+                    "points": [
+                        [
+                            0.0,
+                            0.0
+                        ],
+                        [
+                            0.6935064935064935,
+                            1.0
+                        ],
+                        [
+                            1.0,
+                            0.0
+                        ]
+                    ]
                 }
             },
             "anti_oscillation_lock_frames": 2,
@@ -347,7 +364,7 @@
                     "NOISE_AMOUNT": 0.0,
                     "SETTLE_FRAMES": 2,
                     "SMOOTHING_ALPHA": 0.0,
-                    "SNAP_DISTANCE": 100,
+                    "SNAP_DISTANCE": 110,
                     "activation": {
                         "mode": "always"
                     },
@@ -396,7 +413,7 @@
                         "weapon_sg556"
                     ],
                     "auto_shoot": false,
-                    "auto_shoot_aim_cooldown_ms": 200,
+                    "auto_shoot_aim_cooldown_ms": 300,
                     "enabled": true,
                     "only_when_scoped_visual": false,
                     "priority": 0,
@@ -413,7 +430,7 @@
                     "BODY_KNEE_OFFSET": 0.5,
                     "CLICK_HOLD_MS": 15,
                     "COOLDOWN_MS": 250,
-                    "HEAD_OFFSET": 0.1,
+                    "HEAD_OFFSET": 0.12,
                     "MAX_AIM_SPEED_PX": 35,
                     "NOISE_AMOUNT": 0.0,
                     "SETTLE_FRAMES": 2,
@@ -433,7 +450,7 @@
                         "weapon_sg556"
                     ],
                     "auto_shoot": false,
-                    "auto_shoot_aim_cooldown_ms": 250,
+                    "auto_shoot_aim_cooldown_ms": 300,
                     "enabled": true,
                     "only_when_scoped_visual": false,
                     "priority": 1,
@@ -455,7 +472,7 @@
                     "NOISE_AMOUNT": 0.0,
                     "SETTLE_FRAMES": 0,
                     "SMOOTHING_ALPHA": 0.0,
-                    "SNAP_DISTANCE": 70,
+                    "SNAP_DISTANCE": 120,
                     "activation": {
                         "mode": "always"
                     },
@@ -471,7 +488,7 @@
                     "target_type": "type1"
                 },
                 "Shotgun": {
-                    "AIM_CURVE_ID": "linear",
+                    "AIM_CURVE_ID": "shotgun",
                     "AIM_MODE": "head",
                     "AIM_STRENGTH": 0.6,
                     "AUTO_SHOOT_ZONE_HEIGHT": 36,
@@ -481,21 +498,26 @@
                     "CLICK_HOLD_MS": 15,
                     "COOLDOWN_MS": 250,
                     "HEAD_OFFSET": 0.12,
-                    "MAX_AIM_SPEED_PX": 50,
+                    "MAX_AIM_SPEED_PX": 45,
                     "NOISE_AMOUNT": 0.0,
                     "SETTLE_FRAMES": 2,
                     "SMOOTHING_ALPHA": 0.0,
-                    "SNAP_DISTANCE": 200,
+                    "SNAP_DISTANCE": 90,
                     "activation": {
                         "mode": "always"
                     },
-                    "auto_shoot": true,
+                    "allowed_weapons": [
+                        "weapon_nova",
+                        "weapon_sawedoff",
+                        "weapon_mag7"
+                    ],
+                    "auto_shoot": false,
                     "auto_shoot_aim_cooldown_ms": 0,
                     "enabled": true,
                     "only_when_scoped_visual": false,
                     "priority": 0,
                     "spray_target_offset_enabled": false,
-                    "target_type": "both"
+                    "target_type": "type1"
                 },
                 "Trigger": {
                     "AIM_CURVE_ID": "pistol",
@@ -531,13 +553,19 @@
             },
             "enabled": true,
             "inference_confidence": 0.2,
-            "inference_img_size": 424,
+            "inference_img_size": 448,
             "jitter_deadzone_px": 2.0,
             "manual_target_side": "both",
             "model_path": "./resources/best.pt",
             "near_smoothing_alpha": 0.3,
             "near_smoothing_radius_px": 24.0,
             "position_smoothing_frames": 3,
+            "post_shot_y_suppression": {
+                "enabled": true,
+                "horizontal_stabilization_strength": 0.5,
+                "manual_release_max_hold_ms": 300,
+                "stabilization_strength": 1.2
+            },
             "use_gsi_opponent_side": false
         },
         "kill_sound": {

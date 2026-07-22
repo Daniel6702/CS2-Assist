@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from app.components.cv_trigger.curve_config import build_curve_library
+from app.components.cv_trigger.post_shot_y import default_post_shot_y_suppression_config
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 RESOURCES_DIR = APP_ROOT / "resources"
@@ -146,6 +147,7 @@ def default_profile() -> dict[str, Any]:
                 "anti_oscillation_radius_px": 24.0,
                 "anti_oscillation_reserve_counts": 1,
                 "anti_oscillation_lock_frames": 2,
+                "post_shot_y_suppression": default_post_shot_y_suppression_config(enabled=False),
                 "aim_curves": build_curve_library(),
                 "configs": {
                     "rifle_alt_aim_only": {
