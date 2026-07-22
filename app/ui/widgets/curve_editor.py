@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 from .curve_model import (
-    TEMPLATES,
     CurveDict,
     clamp_sort_points,
     ensure_endpoints,
@@ -13,8 +12,6 @@ from .curve_model import (
     normalize_curve,
     unique_id,
 )
-
-BUILTIN_CURVE_IDS = frozenset(TEMPLATES)
 
 
 # ---------------------------------------------------------------------------
@@ -82,11 +79,6 @@ try:
         def load_curves(self, curves: dict[str, CurveDict]) -> None:
             """Replace internal curve library and rebuild the selector."""
             self._curves = dict(curves)
-            for curve_id, curve in TEMPLATES.items():
-                normalized = normalize_curve(curve)
-                if normalized is not None:
-                    normalized["_id"] = curve_id
-                    self._curves[curve_id] = normalized
             if self._current_id not in self._curves:
                 self._current_id = next(iter(self._curves), "")
             self._rebuild_combo()
@@ -124,8 +116,6 @@ try:
 
         def remove_current_curve(self) -> None:
             """Remove the currently selected curve, if more than one remains."""
-            if self._is_builtin_curve():
-                return
             if len(self._curves) <= 1 or not self._current_id:
                 return
             del self._curves[self._current_id]
@@ -137,8 +127,6 @@ try:
 
         def rename_current_curve(self, new_label: str) -> None:
             """Rename the currently selected curve."""
-            if self._is_builtin_curve():
-                return
             cd = self._current_curve()
             if cd is None:
                 return
@@ -156,8 +144,6 @@ try:
 
         def set_current_points(self, points: list[tuple[float, float]]) -> None:
             """Replace the point data of the current curve."""
-            if self._is_builtin_curve():
-                return
             cd = self._current_curve()
             if cd is None:
                 return
@@ -176,17 +162,10 @@ try:
             cd = self._current_curve()
             return list(cd["points"]) if cd is not None else []
 
-        def template_points(self, template_id: str) -> list[tuple[float, float]]:
-            tpl = TEMPLATES.get(template_id)
-            return list(tpl["points"]) if tpl is not None else []
-
         # -- internal helpers ---------------------------------------------
 
         def _current_curve(self) -> CurveDict | None:
             return self._curves.get(self._current_id)
-
-        def _is_builtin_curve(self) -> bool:
-            return self._current_id in BUILTIN_CURVE_IDS
 
         def _rebuild_combo(self, select: str = "") -> None:
             self.curve_combo.blockSignals(True)
@@ -204,22 +183,20 @@ try:
         def _sync_name_field(self) -> None:
             cd = self._current_curve()
             self.name_edit.setText(cd.get("label", "") if cd else "")
-            self.name_edit.setReadOnly(self._is_builtin_curve())
 
         def _sync_canvas(self) -> None:
             cd = self._current_curve()
             self.canvas.blockSignals(True)
             self.canvas.set_points(list(cd["points"]) if cd is not None else [])
-            self.canvas.set_editable(not self._is_builtin_curve())
+            self.canvas.set_editable(True)
             self.canvas.blockSignals(False)
 
         def _update_button_states(self) -> None:
             has_curves = len(self._curves) > 0
             more_than_one = len(self._curves) > 1
-            editable_curve = has_curves and not self._is_builtin_curve()
-            self.remove_btn.setEnabled(editable_curve and more_than_one)
+            self.remove_btn.setEnabled(has_curves and more_than_one)
             self.copy_btn.setEnabled(has_curves)
-            self.rename_btn.setEnabled(editable_curve)
+            self.rename_btn.setEnabled(has_curves)
 
         def _on_combo_changed(self, index: int) -> None:
             cid = self.curve_combo.itemData(index)
@@ -247,9 +224,6 @@ try:
             self.changed.emit()
 
         def _on_canvas_changed(self) -> None:
-            if self._is_builtin_curve():
-                self._sync_canvas()
-                return
             cd = self._current_curve()
             if cd is None:
                 return
@@ -297,4 +271,4 @@ except ImportError:
             return []
 
         def template_points(self, template_id: str) -> list[tuple[float, float]]:
-            return TEMPLATES.get(template_id, {}).get("points", [])
+            return []

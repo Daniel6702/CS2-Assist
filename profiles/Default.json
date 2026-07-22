@@ -147,101 +147,6 @@
         },
         "cv_trigger": {
             "aim_curves": {
-                "constant_50": {
-                    "label": "Constant 50%",
-                    "points": [
-                        [
-                            0.0,
-                            0.5
-                        ],
-                        [
-                            1.0,
-                            0.5
-                        ]
-                    ]
-                },
-                "exponential": {
-                    "label": "Exponential",
-                    "points": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            0.125,
-                            0.016
-                        ],
-                        [
-                            0.25,
-                            0.063
-                        ],
-                        [
-                            0.375,
-                            0.141
-                        ],
-                        [
-                            0.5,
-                            0.25
-                        ],
-                        [
-                            0.625,
-                            0.391
-                        ],
-                        [
-                            0.75,
-                            0.563
-                        ],
-                        [
-                            0.875,
-                            0.766
-                        ],
-                        [
-                            1.0,
-                            1.0
-                        ]
-                    ]
-                },
-                "linear": {
-                    "label": "Linear",
-                    "points": [
-                        [
-                            0.0,
-                            0.0
-                        ],
-                        [
-                            0.125,
-                            0.125
-                        ],
-                        [
-                            0.25,
-                            0.25
-                        ],
-                        [
-                            0.375,
-                            0.375
-                        ],
-                        [
-                            0.5,
-                            0.5
-                        ],
-                        [
-                            0.625,
-                            0.625
-                        ],
-                        [
-                            0.75,
-                            0.75
-                        ],
-                        [
-                            0.875,
-                            0.875
-                        ],
-                        [
-                            1.0,
-                            1.0
-                        ]
-                    ]
-                },
                 "pistol": {
                     "label": "Pistol",
                     "points": [
@@ -421,7 +326,7 @@
                     "target_type": "type1"
                 },
                 "Rifle_Shooting": {
-                    "AIM_CURVE_ID": "constant_50",
+                    "AIM_CURVE_ID": "pistol",
                     "AIM_MODE": "head",
                     "AIM_STRENGTH": 0.9,
                     "AUTO_SHOOT_ZONE_HEIGHT": 36,

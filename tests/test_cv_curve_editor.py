@@ -14,7 +14,6 @@ import textwrap
 from typing import Any
 
 from app.ui.widgets.curve_editor import (
-    TEMPLATES,
     CurveDict,
     clamp_sort_points,
     ensure_endpoints,
@@ -186,15 +185,13 @@ class LoadCurvesTests(unittest.TestCase):
         self.assertIn("my_curve", result)
         self.assertEqual(result["my_curve"]["label"], "My Curve")
 
-    def test_empty_input_uses_templates(self) -> None:
+    def test_empty_input_returns_empty(self) -> None:
         result = load_curves({})
-        self.assertGreaterEqual(len(result), 3)
-        for key in TEMPLATES:
-            self.assertIn(key, result)
+        self.assertEqual(result, {})
 
-    def test_non_dict_input_uses_templates(self) -> None:
+    def test_non_dict_input_returns_empty(self) -> None:
         result = load_curves(None)
-        self.assertGreaterEqual(len(result), 3)
+        self.assertEqual(result, {})
 
     def test_invalid_entries_dropped(self) -> None:
         raw = {
@@ -207,10 +204,9 @@ class LoadCurvesTests(unittest.TestCase):
         self.assertNotIn("bad", result)
         self.assertNotIn("empty", result)
 
-    def test_all_invalid_falls_back_to_templates(self) -> None:
+    def test_all_invalid_returns_empty(self) -> None:
         result = load_curves({"bad": "nope", "worse": None})
-        for key in TEMPLATES:
-            self.assertIn(key, result)
+        self.assertEqual(result, {})
 
     def test_internal_id_tagged(self) -> None:
         raw = {"lin": {"label": "Linear", "points": [[0, 0], [1, 1]]}}
@@ -220,9 +216,10 @@ class LoadCurvesTests(unittest.TestCase):
 
 class ExtractCurvesTests(unittest.TestCase):
     def test_roundtrip(self) -> None:
-        internal = load_curves(TEMPLATES)  # type: ignore[arg-type]
+        curves = {"my_crv": {"label": "My Curve", "points": [[0, 0], [1, 1]]}}
+        internal = load_curves(curves)
         exported = extract_curves(internal)
-        self.assertEqual(set(exported.keys()), set(TEMPLATES.keys()))
+        self.assertEqual(set(exported.keys()), {"my_crv"})
         for cid, cd in exported.items():
             self.assertIn("label", cd)
             self.assertIn("points", cd)
@@ -232,7 +229,8 @@ class ExtractCurvesTests(unittest.TestCase):
             self.assertNotIn("_id", cd)
 
     def test_values_are_plain_lists_not_tuples(self) -> None:
-        internal = load_curves(TEMPLATES)  # type: ignore[arg-type]
+        curves = {"my_crv": {"label": "My Curve", "points": [[0, 0], [1, 1]]}}
+        internal = load_curves(curves)
         exported = extract_curves(internal)
         for cd in exported.values():
             for pt in cd["points"]:
@@ -242,47 +240,6 @@ class ExtractCurvesTests(unittest.TestCase):
     def test_empty_curves(self) -> None:
         self.assertEqual(extract_curves({}), {})
 
-
-class TemplatesTests(unittest.TestCase):
-    def test_constant_50_structure(self) -> None:
-        tpl = TEMPLATES.get("constant_50")
-        self.assertIsNotNone(tpl)
-        assert tpl is not None
-        self.assertEqual(tpl["label"], "Constant 50%")
-        self.assertEqual(len(tpl["points"]), 2)
-        self.assertAlmostEqual(tpl["points"][0][1], 0.5)
-        self.assertAlmostEqual(tpl["points"][1][1], 0.5)
-
-    def test_linear_structure(self) -> None:
-        tpl = TEMPLATES.get("linear")
-        self.assertIsNotNone(tpl)
-        assert tpl is not None
-        self.assertEqual(tpl["label"], "Linear")
-        self.assertGreater(len(tpl["points"]), 2)
-        for x, y in tpl["points"]:
-            self.assertAlmostEqual(x, y)
-
-    def test_exponential_structure(self) -> None:
-        tpl = TEMPLATES.get("exponential")
-        self.assertIsNotNone(tpl)
-        assert tpl is not None
-        self.assertEqual(tpl["label"], "Exponential")
-        self.assertGreater(len(tpl["points"]), 2)
-
-    def test_all_templates_have_endpoints(self) -> None:
-        for tid, tpl in TEMPLATES.items():
-            with self.subTest(template=tid):
-                pts = tpl["points"]
-                self.assertAlmostEqual(pts[0][0], 0.0, msg=f"{tid} missing x=0 start")
-                self.assertAlmostEqual(pts[-1][0], 1.0, msg=f"{tid} missing x=1 end")
-
-    def test_templates_are_immutable_copies_not_reused(self) -> None:
-        """Each load should produce independent copies (dict immutability
-        isn't enforced, but we check that TEMPLATES themselves are not
-        accidentally mutated through load_curves)."""
-        before_keys = set(TEMPLATES.keys())
-        _ = load_curves({"extra": {"label": "Extra", "points": [[0, 0], [1, 1]]}})
-        self.assertEqual(set(TEMPLATES.keys()), before_keys)
 
 
 # *********************************************************************
@@ -394,25 +351,23 @@ class AimCurveEditorPureApiTests(unittest.TestCase):
         self.assertEqual(self.editor.curve_count(), 0)
 
     def test_load_curves_populates(self) -> None:
-        from app.ui.widgets.curve_editor import TEMPLATES
-
-        self.editor.load_curves(load_curves(TEMPLATES))  # type: ignore[arg-type]
-        self.assertEqual(self.editor.curve_count(), 3)
+        curves = {"a": {"label": "A", "points": [[0, 0], [1, 1]]}}
+        self.editor.load_curves(load_curves(curves))
+        self.assertEqual(self.editor.curve_count(), 1)
         self.assertGreater(self.signal_count, 0)
 
     def test_load_extract_roundtrip(self) -> None:
-        from app.ui.widgets.curve_editor import TEMPLATES
-
-        self.editor.load_curves(load_curves(TEMPLATES))  # type: ignore[arg-type]
+        curves = {"a": {"label": "A", "points": [[0, 0], [1, 1]]}}
+        self.editor.load_curves(load_curves(curves))
         exported = self.editor.extract_curves()
-        self.assertEqual(set(exported.keys()), set(TEMPLATES.keys()))
+        self.assertEqual(set(exported.keys()), {"a"})
 
     def test_add_curve_returns_id_and_selects(self) -> None:
         self.editor.load_curves(load_curves({"lin": {"label": "Linear", "points": [[0, 0], [1, 1]]}}))
         self.signal_count = 0
         cid = self.editor.add_curve("New Curve", [(0.0, 0.0), (1.0, 1.0)])
         self.assertEqual(cid, "new_curve")
-        self.assertEqual(self.editor.curve_count(), 5)
+        self.assertEqual(self.editor.curve_count(), 2)
         self.assertGreater(self.signal_count, 0)
 
     def test_add_curve_dup_name_gets_suffixed_id(self) -> None:
@@ -425,35 +380,7 @@ class AimCurveEditorPureApiTests(unittest.TestCase):
         self.signal_count = 0
         new_id = self.editor.copy_current_curve("Expo Copy")
         self.assertIn("expo_copy", new_id)
-        self.assertEqual(self.editor.curve_count(), 5)
-
-    def test_remove_current_curve(self) -> None:
-        self.editor.load_curves(load_curves({
-            "a": {"label": "A", "points": [[0, 0], [1, 1]]},
-            "b": {"label": "B", "points": [[0, 0.5], [1, 0.5]]},
-        }))
-        self.signal_count = 0
-        self.editor.remove_current_curve()
-        self.assertEqual(self.editor.curve_count(), 4)
-        self.assertGreater(self.signal_count, 0)
-
-    def test_builtin_curves_are_not_removed(self) -> None:
-        from app.ui.widgets.curve_editor import TEMPLATES
-
-        self.editor.load_curves(load_curves(TEMPLATES))  # type: ignore[arg-type]
-        self.signal_count = 0
-
-        self.editor.remove_current_curve()
-
-        self.assertEqual(self.editor.curve_count(), len(TEMPLATES))
-        self.assertEqual(self.signal_count, 0)
-
-    def test_removing_only_custom_curve_leaves_builtins(self) -> None:
-        self.editor.load_curves(load_curves({"a": {"label": "A", "points": [[0, 0], [1, 1]]}}))
-        self.signal_count = 0
-        self.editor.remove_current_curve()
-        self.assertEqual(self.editor.curve_count(), 3)
-        self.assertEqual(self.signal_count, 1)
+        self.assertEqual(self.editor.curve_count(), 2)
 
     def test_rename_current_curve(self) -> None:
         self.editor.load_curves(load_curves({"lin": {"label": "Linear", "points": [[0, 0], [1, 1]]}}))
@@ -480,24 +407,6 @@ class AimCurveEditorPureApiTests(unittest.TestCase):
 
         self.assertIn("edited_name", self.editor.extract_curves())
         self.assertEqual(self.signal_count, 1)
-
-    def test_builtin_curves_are_read_only(self) -> None:
-        from app.ui.widgets.curve_editor import TEMPLATES
-
-        self.editor.load_curves(load_curves(TEMPLATES))  # type: ignore[arg-type]
-        curve_id = self.editor.current_curve_id()
-        before = self.editor.current_curve_points()
-        self.signal_count = 0
-
-        self.editor.rename_current_curve("Edited")
-        self.editor.set_current_points([(0.0, 1.0), (1.0, 0.0)])
-        self.editor.canvas.add_point((0.5, 0.5))
-
-        self.assertEqual(self.editor.current_curve_id(), curve_id)
-        self.assertEqual(self.editor.current_curve_points(), before)
-        self.assertTrue(self.editor.name_edit.isReadOnly())
-        self.assertFalse(self.editor.canvas.editable())
-        self.assertEqual(self.signal_count, 0)
 
     def test_selecting_curve_does_not_emit_data_change(self) -> None:
         self.editor.load_curves(load_curves({
@@ -530,16 +439,6 @@ class AimCurveEditorPureApiTests(unittest.TestCase):
 
     def test_current_curve_points_on_no_selection(self) -> None:
         self.assertEqual(self.editor.current_curve_points(), [])
-
-    def test_template_points(self) -> None:
-        pts = self.editor.template_points("linear")
-        self.assertGreater(len(pts), 2)
-        self.assertEqual(pts[0], [0.0, 0.0])
-        self.assertEqual(pts[-1], [1.0, 1.0])
-
-    def test_template_points_unknown(self) -> None:
-        pts = self.editor.template_points("nonexistent")
-        self.assertEqual(pts, [])
 
     def test_changed_signal_emitted_on_add(self) -> None:
         self.editor.load_curves(load_curves({"a": {"label": "A", "points": [[0, 0], [1, 1]]}}))
@@ -591,14 +490,6 @@ class AimCurveEditorPureApiTests(unittest.TestCase):
         exported = self.editor.extract_curves()
         self.assertEqual(exported["a"]["points"], [[0.0, 0.0], [0.4, 0.8], [1.0, 1.0]])
 
-    def test_changed_signal_not_emitted_on_remove_builtin(self) -> None:
-        from app.ui.widgets.curve_editor import TEMPLATES
-
-        self.editor.load_curves(load_curves(TEMPLATES))  # type: ignore[arg-type]
-        self.signal_count = 0
-        self.editor.remove_current_curve()
-        self.assertEqual(self.signal_count, 0)  # noop → no signal
-
 
 # *********************************************************************
 # Section 3 — Adversarial / edge-case tests (pure helpers)
@@ -626,8 +517,7 @@ class AdversarialTests(unittest.TestCase):
     def test_load_curves_with_all_keys_blank(self) -> None:
         """Whitespace-only keys should be rejected."""
         result = load_curves({"": {"label": "X", "points": [[0, 0], [1, 1]]}})
-        # falls back to templates since no valid key
-        self.assertGreaterEqual(len(result), 3)
+        self.assertEqual(result, {})
 
     def test_unique_id_handles_unicode(self) -> None:
         self.assertIn(unique_id("\u00c9lan", set()), {"lan", "lan_2", "lan_3"})

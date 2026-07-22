@@ -3,8 +3,6 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from app.components.cv_trigger.curve_config import PRESET_CURVES, build_curve_library
-
 CurveDict = dict[str, Any]
 
 
@@ -46,9 +44,6 @@ def unique_id(label: str, existing_ids: set[str]) -> str:
     return f"{base}_{suffix}"
 
 
-TEMPLATES: dict[str, CurveDict] = PRESET_CURVES
-
-
 def normalize_curve(raw: Any, fallback_label: str = "") -> CurveDict | None:
     points_raw: Any = None
     label = fallback_label
@@ -77,7 +72,7 @@ def normalize_curve(raw: Any, fallback_label: str = "") -> CurveDict | None:
 
 def load_curves(raw: Any) -> dict[str, CurveDict]:
     if not isinstance(raw, dict):
-        return build_curve_library()
+        return {}
     out: dict[str, CurveDict] = {}
     for curve_id, raw_value in raw.items():
         if isinstance(curve_id, str) and curve_id.strip():
@@ -85,8 +80,6 @@ def load_curves(raw: Any) -> dict[str, CurveDict]:
             if normalized is not None:
                 normalized["_id"] = curve_id
                 out[curve_id] = normalized
-    if not out:
-        return build_curve_library()
     return out
 
 

@@ -89,21 +89,13 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         outer.setContentsMargins(8, 8, 8, 8)
         outer.setSpacing(6)
 
-        columns_layout = QtWidgets.QHBoxLayout()
-        columns_layout.setSpacing(12)
-        outer.addLayout(columns_layout)
-
-        # ── Left column ────────────────────────────────────────────────
-        left_column = QtWidgets.QVBoxLayout()
-        left_column.setSpacing(12)
-        columns_layout.addLayout(left_column, 1)
-
         # Row 1: Status | Target Side
         row1 = QtWidgets.QHBoxLayout()
         row1.setSpacing(12)
-        left_column.addLayout(row1)
+        outer.addLayout(row1)
 
         status_group = QtWidgets.QGroupBox("Status")
+        status_group.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         status_layout = QtWidgets.QFormLayout(status_group)
         status_layout.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         status_layout.setHorizontalSpacing(12)
@@ -119,6 +111,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         status_layout.addRow("Runtime", self.runtime_status)
 
         target_group = QtWidgets.QGroupBox("Target Side")
+        target_group.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
         target_layout = QtWidgets.QFormLayout(target_group)
         target_layout.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         target_layout.setHorizontalSpacing(12)
@@ -138,13 +131,48 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         target_layout.addRow("Manual target side", self.manual_target_side)
         self.manual_target_side_label = target_layout.labelForField(self.manual_target_side)
 
-        # Row 2: Model Settings
+        # ── Advanced collapsible section (button toggle + box) ────────────
+        self._advanced_btn = QtWidgets.QPushButton("▶  Advanced")
+        self._advanced_btn.setCheckable(True)
+        self._advanced_btn.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        outer.addWidget(self._advanced_btn)
+
+        self._advanced_box = QtWidgets.QGroupBox("Advanced")
+        self._advanced_box.setObjectName("advancedBox")
+        self._advanced_box.setStyleSheet("""
+            QGroupBox#advancedBox {
+                background-color: transparent;
+                border: 1px solid #3c3c3c;
+                border-radius: 6px;
+                margin-top: 14px;
+                padding: 8px;
+            }
+            QGroupBox#advancedBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                color: #ffffff;
+                padding: 0 6px;
+            }
+        """)
+        self._advanced_box.setVisible(False)
+        outer.addWidget(self._advanced_box)
+
+        advanced_layout = QtWidgets.QVBoxLayout(self._advanced_box)
+        advanced_layout.setSpacing(6)
+
+        self._advanced_btn.toggled.connect(self._on_advanced_toggled)
+
+        # Row inside Advanced: Model Settings | Post-Shot Stabilization
+        advanced_row1 = QtWidgets.QHBoxLayout()
+        advanced_row1.setSpacing(12)
+        advanced_layout.addLayout(advanced_row1)
+
         model_group = QtWidgets.QGroupBox("Model Settings")
         model_form = QtWidgets.QFormLayout(model_group)
         model_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         model_form.setHorizontalSpacing(12)
         model_form.setVerticalSpacing(6)
-        left_column.addWidget(model_group)
+        advanced_row1.addWidget(model_group, 1)
 
         self.model_path = QtWidgets.QLineEdit()
         self.model_path.editingFinished.connect(self._emit_change)
@@ -163,17 +191,57 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         self.inference_img_size.valueChanged.connect(self._emit_change)
         model_form.addRow("Image Size", self.inference_img_size)
 
-        # Row 3: Stability and Smoothing | Anti-Oscillation
-        row3 = QtWidgets.QHBoxLayout()
-        row3.setSpacing(12)
-        left_column.addLayout(row3)
+        post_shot_group = QtWidgets.QGroupBox("Post-Shot Stabilization")
+        post_shot_form = QtWidgets.QFormLayout(post_shot_group)
+        post_shot_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+        post_shot_form.setHorizontalSpacing(12)
+        post_shot_form.setVerticalSpacing(6)
+        advanced_row1.addWidget(post_shot_group, 1)
+
+        self.post_shot_y_enabled = QtWidgets.QCheckBox()
+        self.post_shot_y_enabled.setToolTip("Rollback switch. When off, CV aim movement behaves as before.")
+        self.post_shot_y_enabled.stateChanged.connect(self._emit_change)
+        post_shot_form.addRow("Enable Y guard", self.post_shot_y_enabled)
+
+        self.post_shot_y_stabilization_strength = QtWidgets.QDoubleSpinBox()
+        self.post_shot_y_stabilization_strength.setRange(0.0, 1000.0)
+        self.post_shot_y_stabilization_strength.setDecimals(1)
+        self.post_shot_y_stabilization_strength.setSingleStep(5.0)
+        self.post_shot_y_stabilization_strength.setSuffix(" %")
+        self.post_shot_y_stabilization_strength.setToolTip("Scales downward Y blocking and weapon-based recovery time. Raise it if shots still dip below target.")
+        self.post_shot_y_stabilization_strength.valueChanged.connect(self._emit_change)
+        post_shot_form.addRow("Vertical strength", self.post_shot_y_stabilization_strength)
+
+        self.post_shot_x_stabilization_strength = QtWidgets.QDoubleSpinBox()
+        self.post_shot_x_stabilization_strength.setRange(0.0, 1000.0)
+        self.post_shot_x_stabilization_strength.setDecimals(1)
+        self.post_shot_x_stabilization_strength.setSingleStep(5.0)
+        self.post_shot_x_stabilization_strength.setSuffix(" %")
+        self.post_shot_x_stabilization_strength.setToolTip("Scales horizontal X reduction during the same weapon-based recovery window. Lower values keep more sideways aim assist.")
+        self.post_shot_x_stabilization_strength.valueChanged.connect(self._emit_change)
+        post_shot_form.addRow("Horizontal strength", self.post_shot_x_stabilization_strength)
+
+        self.post_shot_manual_release_max_hold_ms = QtWidgets.QSpinBox()
+        self.post_shot_manual_release_max_hold_ms.setRange(0, 5000)
+        self.post_shot_manual_release_max_hold_ms.setSingleStep(25)
+        self.post_shot_manual_release_max_hold_ms.setSuffix(" ms")
+        self.post_shot_manual_release_max_hold_ms.setToolTip(
+            "Manual left-click releases held longer than this are treated as sprays and will not start stabilization."
+        )
+        self.post_shot_manual_release_max_hold_ms.valueChanged.connect(self._emit_change)
+        post_shot_form.addRow("Max tap hold", self.post_shot_manual_release_max_hold_ms)
+
+        # Row inside Advanced: Stability and Smoothing | Anti-Oscillation
+        advanced_row2 = QtWidgets.QHBoxLayout()
+        advanced_row2.setSpacing(12)
+        advanced_layout.addLayout(advanced_row2)
 
         detection_group = QtWidgets.QGroupBox("Stability and Smoothing")
         detection_form = QtWidgets.QFormLayout(detection_group)
         detection_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         detection_form.setHorizontalSpacing(12)
         detection_form.setVerticalSpacing(6)
-        row3.addWidget(detection_group, 1)
+        advanced_row2.addWidget(detection_group, 1)
 
         self.jitter_deadzone_px = QtWidgets.QDoubleSpinBox()
         self.jitter_deadzone_px.setRange(0.0, 100.0)
@@ -215,7 +283,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         anti_oscillation_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         anti_oscillation_form.setHorizontalSpacing(12)
         anti_oscillation_form.setVerticalSpacing(6)
-        row3.addWidget(anti_oscillation_group, 1)
+        advanced_row2.addWidget(anti_oscillation_group, 1)
 
         self.anti_oscillation_radius_px = QtWidgets.QDoubleSpinBox()
         self.anti_oscillation_radius_px.setRange(0.0, 250.0)
@@ -236,47 +304,7 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         self.anti_oscillation_lock_frames.valueChanged.connect(self._emit_change)
         anti_oscillation_form.addRow("Reversal lock frames", self.anti_oscillation_lock_frames)
 
-        post_shot_group = QtWidgets.QGroupBox("Post-Shot Stabilization")
-        post_shot_form = QtWidgets.QFormLayout(post_shot_group)
-        post_shot_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
-        post_shot_form.setHorizontalSpacing(12)
-        post_shot_form.setVerticalSpacing(6)
-        left_column.addWidget(post_shot_group)
-
-        self.post_shot_y_enabled = QtWidgets.QCheckBox()
-        self.post_shot_y_enabled.setToolTip("Rollback switch. When off, CV aim movement behaves as before.")
-        self.post_shot_y_enabled.stateChanged.connect(self._emit_change)
-        post_shot_form.addRow("Enable Y guard", self.post_shot_y_enabled)
-
-        self.post_shot_y_stabilization_strength = QtWidgets.QDoubleSpinBox()
-        self.post_shot_y_stabilization_strength.setRange(0.0, 1000.0)
-        self.post_shot_y_stabilization_strength.setDecimals(1)
-        self.post_shot_y_stabilization_strength.setSingleStep(5.0)
-        self.post_shot_y_stabilization_strength.setSuffix(" %")
-        self.post_shot_y_stabilization_strength.setToolTip("Scales downward Y blocking and weapon-based recovery time. Raise it if shots still dip below target.")
-        self.post_shot_y_stabilization_strength.valueChanged.connect(self._emit_change)
-        post_shot_form.addRow("Vertical strength", self.post_shot_y_stabilization_strength)
-
-        self.post_shot_x_stabilization_strength = QtWidgets.QDoubleSpinBox()
-        self.post_shot_x_stabilization_strength.setRange(0.0, 1000.0)
-        self.post_shot_x_stabilization_strength.setDecimals(1)
-        self.post_shot_x_stabilization_strength.setSingleStep(5.0)
-        self.post_shot_x_stabilization_strength.setSuffix(" %")
-        self.post_shot_x_stabilization_strength.setToolTip("Scales horizontal X reduction during the same weapon-based recovery window. Lower values keep more sideways aim assist.")
-        self.post_shot_x_stabilization_strength.valueChanged.connect(self._emit_change)
-        post_shot_form.addRow("Horizontal strength", self.post_shot_x_stabilization_strength)
-
-        self.post_shot_manual_release_max_hold_ms = QtWidgets.QSpinBox()
-        self.post_shot_manual_release_max_hold_ms.setRange(0, 5000)
-        self.post_shot_manual_release_max_hold_ms.setSingleStep(25)
-        self.post_shot_manual_release_max_hold_ms.setSuffix(" ms")
-        self.post_shot_manual_release_max_hold_ms.setToolTip(
-            "Manual left-click releases held longer than this are treated as sprays and will not start stabilization."
-        )
-        self.post_shot_manual_release_max_hold_ms.valueChanged.connect(self._emit_change)
-        post_shot_form.addRow("Max tap hold", self.post_shot_manual_release_max_hold_ms)
-
-        # ── Right column: Aim Motion Curves ────────────────────────────
+        # Aim Motion Curves (inside Advanced box, below the four inner groups)
         aim_curve_group = QtWidgets.QGroupBox("Aim Motion Curves")
         aim_curve_layout = QtWidgets.QVBoxLayout(aim_curve_group)
         aim_curve_layout.setContentsMargins(8, 8, 8, 8)
@@ -284,18 +312,17 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         self.aim_curve_editor.changed.connect(self._sync_rule_curve_options)
         self.aim_curve_editor.changed.connect(self._emit_change)
         aim_curve_layout.addWidget(self.aim_curve_editor)
-        columns_layout.addWidget(aim_curve_group, 1)
+        advanced_layout.addWidget(aim_curve_group)
+
+        line = QtWidgets.QFrame()
+        line.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        line.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
+        outer.addWidget(line)
 
         rule_header = QtWidgets.QHBoxLayout()
-        label_col = QtWidgets.QVBoxLayout()
-        title_lbl = QtWidgets.QLabel("Rules / configs")
+        title_lbl = QtWidgets.QLabel("Rules")
         title_lbl.setStyleSheet("font-weight: 600;")
-        label_col.addWidget(title_lbl)
-        help_lbl = QtWidgets.QLabel("Each rule can be enabled separately, expanded, renamed, and matched to different activation inputs, target types, and weapons.")
-        help_lbl.setWordWrap(True)
-        help_lbl.setStyleSheet("color: #666;")
-        label_col.addWidget(help_lbl)
-        rule_header.addLayout(label_col, 1)
+        rule_header.addWidget(title_lbl, 1)
 
         self.add_rule_btn = QtWidgets.QPushButton("Add Rule")
         self.add_rule_btn.clicked.connect(self._on_add_rule_clicked)
@@ -314,6 +341,10 @@ class CVTriggerEditor(QtWidgets.QGroupBox):
         manual_visible = not self.use_gsi_opponent_side.isChecked()
         self.manual_target_side.setVisible(manual_visible)
         self.manual_target_side_label.setVisible(manual_visible)
+
+    def _on_advanced_toggled(self, checked: bool) -> None:
+        self._advanced_box.setVisible(checked)
+        self._advanced_btn.setText("▼  Advanced" if checked else "▶  Advanced")
 
     def mark_runtime_waiting(self) -> None:
         if not self.enabled.isChecked():

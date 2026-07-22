@@ -115,11 +115,6 @@ class CVRuleEditor(QtWidgets.QFrame):
 
         outer.addLayout(header)
 
-        self.summary = QtWidgets.QLabel("")
-        self.summary.setStyleSheet("color: #666;")
-        self.summary.setWordWrap(True)
-        outer.addWidget(self.summary)
-
         self.content = QtWidgets.QWidget()
         self.content.setVisible(False)
         outer.addWidget(self.content)
@@ -162,7 +157,7 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.priority.valueChanged.connect(self._emit_change)
         activation_form.addRow("Priority", self.priority)
 
-        filter_group = QtWidgets.QGroupBox("Target & Weapon Filters")
+        filter_group = QtWidgets.QGroupBox("Weapon Filter")
         filter_form = QtWidgets.QFormLayout(filter_group)
         filter_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         filter_form.setHorizontalSpacing(12)
@@ -173,17 +168,6 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.allowed_weapons.setPlaceholderText("weapon_ak47, ak, m4a1s")
         self.allowed_weapons.editingFinished.connect(self._emit_change)
         filter_form.addRow("Only for weapons", self.allowed_weapons)
-
-        self.target_type = QtWidgets.QComboBox()
-        self.target_type.addItem("Type 1 (T / C)", "type1")
-        self.target_type.addItem("Type 2 (TH / CH)", "type2")
-        self.target_type.addItem("Both types", "both")
-        self.target_type.currentIndexChanged.connect(self._emit_change)
-        filter_form.addRow("Target type", self.target_type)
-
-        self.only_when_scoped_visual = QtWidgets.QCheckBox()
-        self.only_when_scoped_visual.stateChanged.connect(self._emit_change)
-        filter_form.addRow("Visually scoped only", self.only_when_scoped_visual)
 
         tuning_row1 = QtWidgets.QHBoxLayout()
         tuning_row1.setSpacing(10)
@@ -233,29 +217,23 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.auto_shoot_aim_cooldown_ms.valueChanged.connect(self._emit_change)
         targeting_form.addRow("Kill cooldown", self.auto_shoot_aim_cooldown_ms)
 
-        timing_group = QtWidgets.QGroupBox("Auto Shoot")
-        timing_layout = QtWidgets.QHBoxLayout(timing_group)
-        timing_layout.setContentsMargins(8, 8, 8, 8)
-        timing_layout.setSpacing(12)
-        timing_form = QtWidgets.QFormLayout()
-        timing_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
-        timing_form.setHorizontalSpacing(12)
-        timing_form.setVerticalSpacing(6)
-        threshold_form = QtWidgets.QFormLayout()
-        threshold_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
-        threshold_form.setHorizontalSpacing(12)
-        threshold_form.setVerticalSpacing(6)
-        timing_layout.addLayout(timing_form, 1)
-        timing_layout.addLayout(threshold_form, 1)
-        tuning_row1.addWidget(timing_group, 1)
+        self.target_type = QtWidgets.QComboBox()
+        self.target_type.addItem("Type 1 (T / C)", "type1")
+        self.target_type.addItem("Type 2 (TH / CH)", "type2")
+        self.target_type.addItem("Both types", "both")
+        self.target_type.currentIndexChanged.connect(self._emit_change)
+        targeting_form.addRow("Target type", self.target_type)
 
-        # ── Aim Tuning (new configurable box) ────────────────────────────
+        self.only_when_scoped_visual = QtWidgets.QCheckBox()
+        self.only_when_scoped_visual.stateChanged.connect(self._emit_change)
+        targeting_form.addRow("Visually scoped only", self.only_when_scoped_visual)
+
         aim_tuning_group = QtWidgets.QGroupBox("Aim Tuning")
         aim_tuning_form = QtWidgets.QFormLayout(aim_tuning_group)
         aim_tuning_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         aim_tuning_form.setHorizontalSpacing(12)
         aim_tuning_form.setVerticalSpacing(6)
-        content_layout.addWidget(aim_tuning_group)
+        tuning_row1.addWidget(aim_tuning_group, 1)
 
         self.aim_strength = QtWidgets.QDoubleSpinBox()
         self.aim_strength.setRange(0.0, 100.0)
@@ -309,6 +287,13 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.noise_amount.valueChanged.connect(self._emit_change)
         aim_tuning_form.addRow("Noise Amount", self.noise_amount)
 
+        timing_group = QtWidgets.QGroupBox("Auto Shoot")
+        timing_form = QtWidgets.QFormLayout(timing_group)
+        timing_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
+        timing_form.setHorizontalSpacing(12)
+        timing_form.setVerticalSpacing(6)
+        tuning_row1.addWidget(timing_group, 1)
+
         self.auto_shoot = QtWidgets.QCheckBox()
         self.auto_shoot.stateChanged.connect(self._emit_change)
         timing_form.addRow("Enable", self.auto_shoot)
@@ -336,7 +321,7 @@ class CVRuleEditor(QtWidgets.QFrame):
             "The zone is centred horizontally on the target detection box."
         )
         self.auto_shoot_zone_width.valueChanged.connect(self._emit_change)
-        threshold_form.addRow("Zone width", self.auto_shoot_zone_width)
+        timing_form.addRow("Zone width", self.auto_shoot_zone_width)
 
         self.auto_shoot_zone_height = QtWidgets.QSpinBox()
         self.auto_shoot_zone_height.setRange(0, 500)
@@ -346,7 +331,7 @@ class CVRuleEditor(QtWidgets.QFrame):
             "The zone is centred vertically at the Y position below."
         )
         self.auto_shoot_zone_height.valueChanged.connect(self._emit_change)
-        threshold_form.addRow("Zone height", self.auto_shoot_zone_height)
+        timing_form.addRow("Zone height", self.auto_shoot_zone_height)
 
         self.auto_shoot_zone_y_pos = QtWidgets.QDoubleSpinBox()
         self.auto_shoot_zone_y_pos.setRange(0.0, 1.0)
@@ -358,7 +343,7 @@ class CVRuleEditor(QtWidgets.QFrame):
             "0.30–0.40 is a good range for head / upper-chest targeting."
         )
         self.auto_shoot_zone_y_pos.valueChanged.connect(self._emit_change)
-        threshold_form.addRow("Zone Y position", self.auto_shoot_zone_y_pos)
+        timing_form.addRow("Zone Y position", self.auto_shoot_zone_y_pos)
 
         input_row_height = self.aim_mode.sizeHint().height()
         for checkbox in (
@@ -369,7 +354,6 @@ class CVRuleEditor(QtWidgets.QFrame):
             checkbox.setMinimumHeight(input_row_height)
 
         self._update_activation_visibility()
-        self._update_summary()
 
     def _toggle_expanded(self, checked: bool) -> None:
         self.expand.setArrowType(QtCore.Qt.ArrowType.DownArrow if checked else QtCore.Qt.ArrowType.RightArrow)
@@ -378,7 +362,6 @@ class CVRuleEditor(QtWidgets.QFrame):
     def _sync_header_title(self) -> None:
         title = self.rule_name() or "Unnamed rule"
         self.expand.setText(title)
-        self._update_summary()
 
     def _update_activation_visibility(self) -> None:
         mode = self.activation_mode.currentText().strip().lower()
@@ -386,7 +369,6 @@ class CVRuleEditor(QtWidgets.QFrame):
         self.activation_button.setVisible(mode == "mouse")
         self.activation_key_label.setVisible(mode == "keyboard")
         self.activation_button_label.setVisible(mode == "mouse")
-        self._update_summary()
 
     def set_available_curves(self, curves: dict[str, Any]) -> None:
         current = str(self.aim_curve_id.currentData() or self.aim_curve_id.currentText() or "linear")
@@ -426,30 +408,6 @@ class CVRuleEditor(QtWidgets.QFrame):
     def _set_target_type_value(self, value: str) -> None:
         idx = self.target_type.findData(value)
         self.target_type.setCurrentIndex(idx if idx >= 0 else self.target_type.findData("both"))
-
-    def _update_summary(self) -> None:
-        name = self.rule_name() or "Unnamed rule"
-        mode = self.activation_mode.currentText().strip().lower()
-        if mode == "always":
-            activation = "always active"
-        elif mode == "mouse":
-            activation = f"hold mouse {self.activation_button.currentText()}"
-        else:
-            activation = f"hold key {self.activation_key.text().strip() or 'alt'}"
-        weapons = self.allowed_weapons.text().strip()
-        weapon_text = f" | weapons: {weapons}" if weapons else " | any weapon"
-        shoot_text = " | auto shoot" if self.auto_shoot.isChecked() else " | aim only"
-        priority_text = f" | priority {self.priority.value()}"
-        aim_cd = self.auto_shoot_aim_cooldown_ms.value()
-        aim_cd_text = f" | kill cd {aim_cd}ms" if aim_cd > 0 else ""
-        zw = self.auto_shoot_zone_width.value()
-        zh = self.auto_shoot_zone_height.value()
-        zy = self.auto_shoot_zone_y_pos.value()
-        zone_text = f" | zone {zw}×{zh} @ y={zy:.2f}" if self.auto_shoot.isChecked() else ""
-        type_text = f" | {self._target_type_value()}"
-        scope_text = " | scoped only" if self.only_when_scoped_visual.isChecked() else ""
-        spray_text = " | spray-align" if self.spray_target_offset_enabled.isChecked() else ""
-        self.summary.setText(f"{name} — {activation}{priority_text}{weapon_text}{type_text}{scope_text}{shoot_text}{spray_text}{aim_cd_text}{zone_text}")
 
     def rule_name(self) -> str:
         return self.name_edit.text().strip()
@@ -512,7 +470,6 @@ class CVRuleEditor(QtWidgets.QFrame):
             self._update_activation_visibility()
         finally:
             self._suspend = False
-            self._update_summary()
 
     def extract_rule(self) -> tuple[str, dict[str, Any]]:
         data: dict[str, Any] = {}
@@ -566,5 +523,4 @@ class CVRuleEditor(QtWidgets.QFrame):
     def _emit_change(self, *args) -> None:
         if self._suspend:
             return
-        self._update_summary()
         self.changed.emit()
