@@ -35,7 +35,7 @@ def _make_editor() -> CVTriggerEditor:
 def _base_config() -> dict[str, Any]:
     return {
         "enabled": True,
-        "model_path": "/models/best.pt",
+        "model_path": "/models/checkpoint.pt",
         "configs": {
             "pistol_alt": {
                 "enabled": True,

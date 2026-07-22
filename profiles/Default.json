@@ -147,7 +147,7 @@
         },
         "cv_trigger": {
             "enabled": true,
-            "model_path": "./resources/best.pt",
+            "model_path": "./resources/checkpoint.pt",
             "use_gsi_opponent_side": false,
             "manual_target_side": "both",
             "inference_confidence": 0.2,
@@ -495,7 +495,7 @@
             "enabled": true,
             "clicks_per_second": 30.0,
             "click_hold_ms": 20,
-            "allowed_weapon_file": "./resources/weapon_codes.txt"
+            "allowed_weapon_file": "./resources/weapons_data/semi-auto_weapon_codes.txt"
         },
         "flash_filter": {
             "enabled": true,

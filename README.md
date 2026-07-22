@@ -192,7 +192,7 @@ Component settings live under `components` in each profile.
 - `long_jump`: Linux keyboard component that watches the configured key and sends CS2 console commands through the cfg command bridge for the jump/duck long-jump sequence.
 - `recoil`: Mouse recoil control using `resources/mouse_patterns.json`, GSI weapon state when available, sensitivity scaling, movement frequency, axis strength, optional noise, return-mouse behavior, and an optional bullet overlay.
 - `pixel_trigger`: Screen-pixel based trigger component using `mss`, a hold key, color-change threshold, click delay, cooldown, polling interval, monitor index, optional fixed coordinates, debug, and dry-run settings.
-- `cv_trigger`: Computer-vision trigger/aim component using `resources/best.pt`, automatic monitor capture sizing, shared game-resolution settings, target-side settings, inference thresholds, smoothing/prediction values, global anti-oscillation settings, a global aim curve library, and per-rule activation/weapon/target/click settings.
+- `cv_trigger`: Computer-vision trigger/aim component using `resources/checkpoint.pt`, automatic monitor capture sizing, shared game-resolution settings, target-side settings, inference thresholds, smoothing/prediction values, global anti-oscillation settings, a global aim curve library, and per-rule activation/weapon/target/click settings.
 
 #### CV Trigger Aim Assist Tuning
 
@@ -277,7 +277,7 @@ Confirm setup completed successfully and that CS2 has loaded `autoexec.cfg`. The
 
 ### model not found
 
-CV Trigger requires the model path configured at `components.cv_trigger.model_path`. The default project resource is `resources/best.pt`, and `profiles/Default.json` points to that file in this checkout.
+CV Trigger requires the model path configured at `components.cv_trigger.model_path`. The default project resource is `resources/checkpoint.pt`, and `profiles/Default.json` points to that file in this checkout.
 
 If the log reports `Model not found`, update the CV Trigger model path in the profile or restore the missing model file.
 

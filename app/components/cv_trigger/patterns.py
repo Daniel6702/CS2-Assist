@@ -10,29 +10,29 @@ from .activation import _canon_text
 PATTERNS_FILE = Path(__file__).resolve().parents[3] / "resources" / "mouse_patterns.json"
 
 _PATTERN_ALIASES = {
-    "ak": "AK",
-    "ak47": "AK",
-    "weaponak47": "AK",
-    "m4a1": "M4A1",
-    "m4a1s": "M4A1",
-    "m4a1silencer": "M4A1",
-    "weaponm4a1silencer": "M4A1",
-    "m4a4": "M4A4",
-    "weaponm4a1": "M4A4",
-    "famas": "Famas",
-    "weaponfamas": "Famas",
-    "galil": "Galil",
-    "galilar": "Galil",
-    "weapongalilar": "Galil",
-    "ump": "UMP",
-    "ump45": "UMP",
-    "weaponump45": "UMP",
-    "aug": "AUG",
-    "weaponaug": "AUG",
-    "sg": "SG",
-    "sg553": "SG",
-    "sg556": "SG",
-    "weaponsg556": "SG",
+    "ak": "weapon_ak47",
+    "ak47": "weapon_ak47",
+    "weaponak47": "weapon_ak47",
+    "m4a1": "weapon_m4a1_silencer",
+    "m4a1s": "weapon_m4a1_silencer",
+    "m4a1silencer": "weapon_m4a1_silencer",
+    "weaponm4a1silencer": "weapon_m4a1_silencer",
+    "m4a4": "weapon_m4a1",
+    "weaponm4a1": "weapon_m4a1",
+    "famas": "weapon_famas",
+    "weaponfamas": "weapon_famas",
+    "galil": "weapon_galilar",
+    "galilar": "weapon_galilar",
+    "weapongalilar": "weapon_galilar",
+    "ump": "weapon_ump45",
+    "ump45": "weapon_ump45",
+    "weaponump45": "weapon_ump45",
+    "aug": "weapon_aug",
+    "weaponaug": "weapon_aug",
+    "sg": "weapon_sg556",
+    "sg553": "weapon_sg556",
+    "sg556": "weapon_sg556",
+    "weaponsg556": "weapon_sg556",
 }
 
 def load_pattern_file(path: Path) -> dict[str, Any]:
@@ -79,7 +79,10 @@ def _scaled_recoil_pattern_steps(pattern_file: dict[str, Any], requested_name: s
         return []
 
     data = pattern_file.get("patterns", {})
-    raw_steps = list(data.get(resolved_name, {}).get("steps", []))
+    pattern_data = data.get(resolved_name, {})
+    pattern_scale_x = float(pattern_data.get("scale_x", 1.0))
+    pattern_scale_y = float(pattern_data.get("scale_y", 1.0))
+    raw_steps = list(pattern_data.get("steps", []))
     axis = dict(recoil_sync.get("axis_strength_percent", {}) or {})
     sens = dict(recoil_sync.get("sensitivity", {}) or {})
     sens_ax = dict(sens.get("apply_to_axis", {}) or {})
@@ -100,10 +103,10 @@ def _scaled_recoil_pattern_steps(pattern_file: dict[str, Any], requested_name: s
     out: list[tuple[float, float, int]] = []
     for step in raw_steps:
         try:
-            dx = float(step.get("dx", 0.0)) * x_strength * mod_x
-            dy = float(step.get("dy", 0.0)) * y_strength * mod_y
+            dx = float(step.get("dx", 0.0)) * pattern_scale_x * x_strength * mod_x
+            dy = float(step.get("dy", 0.0)) * pattern_scale_y * y_strength * mod_y
             duration_ms = max(1, int(step.get("duration_ms", 1)))
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             continue
         out.append((dx, dy, duration_ms))
     return out
@@ -176,7 +179,7 @@ def _infer_target_type_from_legacy_classes(classes_value: Any) -> str:
         return "both"
     try:
         values = {int(v) for v in classes_value}
-    except Exception:
+    except (TypeError, ValueError):
         return "both"
 
     type1 = {0, 2}

@@ -9,7 +9,7 @@ from app.components.cv_trigger.post_shot_y import default_post_shot_y_suppressio
 APP_ROOT = Path(__file__).resolve().parents[1]
 RESOURCES_DIR = APP_ROOT / "resources"
 PROFILES_DIR = APP_ROOT / "profiles"
-MODEL_FILE = RESOURCES_DIR / "best.pt"
+MODEL_FILE = RESOURCES_DIR / "checkpoint.pt"
 
 
 def default_profile() -> dict[str, Any]:
@@ -133,7 +133,7 @@ def default_profile() -> dict[str, Any]:
                 "enabled": False,
                 "clicks_per_second": 8.0,
                 "click_hold_ms": 20,
-                "allowed_weapon_file": "./resources/weapon_codes.txt",
+                "allowed_weapon_file": "./resources/weapons_data/semi-auto_weapon_codes.txt",
             },
             "flash_filter": {
                 "enabled": False,

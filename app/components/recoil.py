@@ -24,9 +24,7 @@ try:
 except ImportError:  # pragma: no cover
     uinput = None
 
-
-PATTERNS_FILE = Path(__file__).resolve().parents[2] / "resources" / "mouse_patterns.json"
-
+PATTERNS_FILE = Path(__file__).resolve().parents[2] / "resources" / "weapons_data" / "spray_patterns.json"
 
 @dataclass(frozen=True)
 class PatternStep:
@@ -65,29 +63,29 @@ class RuntimeSettings:
 
 
 _PATTERN_ALIASES: dict[str, str] = {
-    "ak": "AK",
-    "ak47": "AK",
-    "weaponak47": "AK",
-    "m4a1": "M4A1",
-    "m4a1s": "M4A1",
-    "m4a1silencer": "M4A1",
-    "weaponm4a1silencer": "M4A1",
-    "m4a4": "M4A4",
-    "weaponm4a1": "M4A4",
-    "famas": "Famas",
-    "weaponfamas": "Famas",
-    "galil": "Galil",
-    "galilar": "Galil",
-    "weapongalilar": "Galil",
-    "ump": "UMP",
-    "ump45": "UMP",
-    "weaponump45": "UMP",
-    "aug": "AUG",
-    "weaponaug": "AUG",
-    "sg": "SG",
-    "sg553": "SG",
-    "sg556": "SG",
-    "weaponsg556": "SG",
+    "ak": "weapon_ak47",
+    "ak47": "weapon_ak47",
+    "weaponak47": "weapon_ak47",
+    "m4a1": "weapon_m4a1_silencer",
+    "m4a1s": "weapon_m4a1_silencer",
+    "m4a1silencer": "weapon_m4a1_silencer",
+    "weaponm4a1silencer": "weapon_m4a1_silencer",
+    "m4a4": "weapon_m4a1",
+    "weaponm4a1": "weapon_m4a1",
+    "famas": "weapon_famas",
+    "weaponfamas": "weapon_famas",
+    "galil": "weapon_galilar",
+    "galilar": "weapon_galilar",
+    "weapongalilar": "weapon_galilar",
+    "ump": "weapon_ump45",
+    "ump45": "weapon_ump45",
+    "weaponump45": "weapon_ump45",
+    "aug": "weapon_aug",
+    "weaponaug": "weapon_aug",
+    "sg": "weapon_sg556",
+    "sg553": "weapon_sg556",
+    "sg556": "weapon_sg556",
+    "weaponsg556": "weapon_sg556",
 }
 
 
@@ -163,7 +161,10 @@ def parse_pattern(pattern_file: dict[str, Any], name: str, st: RuntimeSettings, 
         available = ", ".join(sorted(data.keys())) if data else "<none>"
         raise ValueError(f"Pattern '{name}' not found in mouse_patterns.json. Available: {available}")
 
-    raw_steps = data[resolved_name]["steps"]
+    pattern_data = data[resolved_name]
+    pattern_scale_x = float(pattern_data.get("scale_x", 1.0))
+    pattern_scale_y = float(pattern_data.get("scale_y", 1.0))
+    raw_steps = pattern_data["steps"]
     if max_steps is not None and max_steps >= 0:
         raw_steps = raw_steps[:max_steps]
 
@@ -175,8 +176,8 @@ def parse_pattern(pattern_file: dict[str, Any], name: str, st: RuntimeSettings, 
 
     parsed: list[PatternStep] = []
     for step in raw_steps:
-        dx = float(step["dx"]) * sx * mod_x
-        dy = float(step["dy"]) * sy * mod_y
+        dx = float(step["dx"]) * pattern_scale_x * sx * mod_x
+        dy = float(step["dy"]) * pattern_scale_y * sy * mod_y
         dur = max(1, int(step["duration_ms"]))
         parsed.append(PatternStep(dx=dx, dy=dy, duration_ms=dur))
     return parsed
@@ -243,7 +244,7 @@ class MouseBackend:
             self._SendInput(1, ctypes.byref(inp), ctypes.sizeof(inp))
             return
 
-        if self._uinput_dev is not None:
+        if self._uinput_dev is not None and uinput is not None:
             self._uinput_dev.emit(uinput.REL_X, dx, syn=False)
             self._uinput_dev.emit(uinput.REL_Y, dy)
         elif self._pynput_mouse is not None:

@@ -84,7 +84,7 @@ class AutoShootComponentTests(unittest.TestCase):
                 "enabled": True,
                 "clicks_per_second": 80.0,
                 "click_hold_ms": 7,
-                "allowed_weapon_file": "./resources/weapon_codes.txt",
+                "allowed_weapon_file": "./resources/weapons_data/semi-auto_weapon_codes.txt",
             }
         )
 
@@ -111,7 +111,7 @@ class AutoShootComponentTests(unittest.TestCase):
                 "enabled": True,
                 "clicks_per_second": 80.0,
                 "click_hold_ms": 5,
-                "allowed_weapon_file": "./resources/weapon_codes.txt",
+                "allowed_weapon_file": "./resources/weapons_data/semi-auto_weapon_codes.txt",
             }
         )
 
@@ -134,7 +134,7 @@ class AutoShootComponentTests(unittest.TestCase):
                 "enabled": True,
                 "clicks_per_second": 80.0,
                 "click_hold_ms": 7,
-                "allowed_weapon_file": "./resources/weapon_codes.txt",
+                "allowed_weapon_file": "./resources/weapons_data/semi-auto_weapon_codes.txt",
             }
         )
 
@@ -169,7 +169,7 @@ class AutoShootWiringTests(unittest.TestCase):
                 "enabled": False,
                 "clicks_per_second": 8.0,
                 "click_hold_ms": 20,
-                "allowed_weapon_file": "./resources/weapon_codes.txt",
+                "allowed_weapon_file": "./resources/weapons_data/semi-auto_weapon_codes.txt",
             },
         )
 

@@ -8,7 +8,7 @@ from typing import Final
 from .activation import canonical_weapon_name
 
 
-WEAPON_RECOIL_FILE: Final = Path(__file__).resolve().parents[3] / "resources" / "cs2_weapon_fire_rate_recoil.csv"
+WEAPON_RECOIL_FILE: Final = Path(__file__).resolve().parents[3] / "resources" / "weapons_data" / "cs2_weapon_fire_rate_recoil.csv"
 FAST_AUTOMATIC_MAX_INTERVAL_MS: Final = 130.0
 HIGH_RECOIL_AUTOMATIC_MIN_AMOUNT: Final = 25.0
 EARLY_SPRAY_HOLD_INTERVALS: Final = 2.0

@@ -92,7 +92,7 @@ class AutoShootComponent(BaseComponent):
             self._clicks_per_second = max(0.1, float(config.get("clicks_per_second", 8.0) or 8.0))
             self._click_hold_ms = max(1, int(config.get("click_hold_ms", 20) or 20))
             self._allowed_weapons = _load_allowed_weapons(
-                str(config.get("allowed_weapon_file", "./resources/weapon_codes.txt") or "./resources/weapon_codes.txt")
+                str(config.get("allowed_weapon_file", "./resources/weapons_data/semi-auto_weapon_codes.txt") or "./resources/weapons_data/semi-auto_weapon_codes.txt")
             )
 
     def start(self) -> None:

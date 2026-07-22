@@ -30,7 +30,7 @@ def _make_editor() -> CVTriggerEditor:
 def _base_config() -> dict[str, Any]:
     return {
         "enabled": True,
-        "model_path": "/models/best.pt",
+        "model_path": "/models/checkpoint.pt",
         "monitor": {"top": 0, "left": 0, "width": 2560, "height": 1440},
         "game_resolution": {"width": 1600, "height": 1200},
         "inference_confidence": 0.15,

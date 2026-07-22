@@ -19,7 +19,7 @@ from app.components.cv_trigger.weapon_recoil import (
 
 class WeaponRecoilDataTests(unittest.TestCase):
     def test_loads_real_csv_and_canonical_weapon_lookup(self) -> None:
-        table = load_weapon_recoil_table(Path("resources/cs2_weapon_fire_rate_recoil.csv"))
+        table = load_weapon_recoil_table(Path("resources/weapons_data/cs2_weapon_fire_rate_recoil.csv"))
 
         deagle = weapon_recoil_info(table, "weapon_deagle")
         usp = weapon_recoil_info(table, "weapon_usp_silencer")

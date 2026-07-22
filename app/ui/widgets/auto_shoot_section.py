@@ -38,7 +38,7 @@ class AutoShootSection(QtWidgets.QGroupBox):
 
         file_row = QtWidgets.QHBoxLayout()
         self.weapon_file = QtWidgets.QLineEdit()
-        self.weapon_file.setPlaceholderText("./resources/weapon_codes.txt")
+        self.weapon_file.setPlaceholderText("./resources/weapons_data/semi-auto_weapon_codes.txt")
         self.weapon_file.editingFinished.connect(self.changed)
         file_row.addWidget(self.weapon_file, 1)
         browse_btn = QtWidgets.QPushButton("Browse...")
@@ -51,7 +51,7 @@ class AutoShootSection(QtWidgets.QGroupBox):
         self.cps.setValue(max(0.1, min(100.0, float(config.get("clicks_per_second", 8.0) or 8.0))))
         self.hold_ms.setValue(max(1, min(200, int(config.get("click_hold_ms", 20) or 20))))
         self.weapon_file.setText(
-            str(config.get("allowed_weapon_file", "./resources/weapon_codes.txt") or "./resources/weapon_codes.txt")
+            str(config.get("allowed_weapon_file", "./resources/weapons_data/semi-auto_weapon_codes.txt") or "./resources/weapons_data/semi-auto_weapon_codes.txt")
         )
 
     def extract_config(self) -> dict[str, Any]:
@@ -59,7 +59,7 @@ class AutoShootSection(QtWidgets.QGroupBox):
             "enabled": self.enabled.isChecked(),
             "clicks_per_second": self.cps.value(),
             "click_hold_ms": self.hold_ms.value(),
-            "allowed_weapon_file": self.weapon_file.text().strip() or "./resources/weapon_codes.txt",
+            "allowed_weapon_file": self.weapon_file.text().strip() or "./resources/weapons_data/semi-auto_weapon_codes.txt",
         }
 
     def _browse(self) -> None:
