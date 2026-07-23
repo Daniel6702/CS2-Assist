@@ -11,6 +11,7 @@ from app.cs2_integration.command_bridge import CS2CommandBridge
 from app.cs2_integration.settings import load_settings
 from app.components.pixel_trigger import PixelTriggerComponent
 from app.components.recoil import RecoilComponent
+from app.components.sniper_crosshair import SniperCrosshairComponent
 from app.device_service import DeviceService
 from app.profile_store import ProfileStore
 from app.platform.monitor import default_monitor_geometry
@@ -31,6 +32,7 @@ from app.ui.tabs import (
 from app.ui.widgets.bomb_timer_overlay import BombTimerOverlay
 from app.ui.widgets.bullet_overlay import BulletImpactOverlay
 from app.ui.widgets.log_bridge import LogBridge
+from app.ui.widgets.sniper_crosshair_overlay import SniperCrosshairOverlay
 
 
 _COMPONENT_SCHEMA_NAMES: Final[frozenset[str]] = frozenset(name for name, _title, _schema in component_schemas())
@@ -112,9 +114,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.hotkeys.activated.connect(self._on_hotkey_activated)
         self.bullet_overlay = BulletImpactOverlay()
         self.bomb_timer_overlay = BombTimerOverlay()
+        self.sniper_crosshair_overlay = SniperCrosshairOverlay()
         self.overlay_timer = QtCore.QTimer(self)
         self.overlay_timer.timeout.connect(self._tick_bullet_overlay)
         self.overlay_timer.timeout.connect(self._tick_bomb_timer)
+        self.overlay_timer.timeout.connect(self._tick_sniper_crosshair_overlay)
         self.overlay_timer.timeout.connect(self._tick_pixel_trigger_scope_status)
 
         self.current_profile_name = "Default"
@@ -332,6 +336,16 @@ class MainWindow(QtWidgets.QMainWindow):
             bomb_active, remaining, show_warning, font_size, color_str,
         )
 
+    def _tick_sniper_crosshair_overlay(self) -> None:
+        if self._closing:
+            self.sniper_crosshair_overlay.hide_overlay()
+            return
+        component = self.runtime.components.get("sniper_crosshair")
+        if not isinstance(component, SniperCrosshairComponent):
+            self.sniper_crosshair_overlay.hide_overlay()
+            return
+        self.sniper_crosshair_overlay.update_state(component.overlay_state())
+
     def _runtime_status(self, source: str, message: str) -> None:
         if self._closing or not hasattr(self, "current_profile_data"):
             return
@@ -412,6 +426,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.misc_tab.load_config("bomb_timer", deep_get(self.current_profile_data, "components.bomb_timer", {}))
             self.misc_tab.load_config("auto_accept", deep_get(self.current_profile_data, "components.auto_accept", {}))
             self.misc_tab.load_config("auto_shoot", deep_get(self.current_profile_data, "components.auto_shoot", {}))
+            self.misc_tab.load_config("sniper_crosshair", deep_get(self.current_profile_data, "components.sniper_crosshair", {}))
             self.misc_tab.load_config("flash_filter", deep_get(self.current_profile_data, "components.flash_filter", {}))
             self._movement_hotkey_disabled.clear()
             self._configure_hotkeys()
@@ -539,6 +554,10 @@ class MainWindow(QtWidgets.QMainWindow):
         if component_name == "cv_trigger":
             self.cv_trigger_tab.mark_runtime_waiting()
         self.runtime.restart_component(component_name, self.current_profile_data)
+        if component_name == "pixel_trigger":
+            self.runtime.restart_component("sniper_crosshair", self.current_profile_data)
+        elif component_name == "sniper_crosshair":
+            self.runtime.restart_component("pixel_trigger", self.current_profile_data)
 
     def _on_shared_settings_changed(self) -> None:
         if self._loading_profile:
@@ -550,7 +569,7 @@ class MainWindow(QtWidgets.QMainWindow):
         finally:
             self._loading_profile = False
         self.profile_store.save_profile(self.current_profile_name, self.current_profile_data)
-        for name in ("bhop", "snap_tap", "counter_strafe", "long_jump", "auto_air_strafe", "recoil", "pixel_trigger", "cv_trigger"):
+        for name in ("bhop", "snap_tap", "counter_strafe", "long_jump", "auto_air_strafe", "recoil", "pixel_trigger", "sniper_crosshair", "cv_trigger"):
             self.runtime.restart_component(name, self.current_profile_data)
 
     def _on_hotkeys_changed(self) -> None:
@@ -666,6 +685,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.misc_tab.load_config("kill_sound", deep_get(self.current_profile_data, "components.kill_sound", {}))
         elif name == "auto_shoot":
             self.misc_tab.load_config("auto_shoot", deep_get(self.current_profile_data, "components.auto_shoot", {}))
+        elif name == "sniper_crosshair":
+            self.misc_tab.load_config("sniper_crosshair", deep_get(self.current_profile_data, "components.sniper_crosshair", {}))
         elif name == "flash_filter":
             self.misc_tab.load_config("flash_filter", deep_get(self.current_profile_data, "components.flash_filter", {}))
         self.runtime.restart_component(name, self.current_profile_data)
@@ -721,6 +742,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._closing = True
         self.hotkeys.stop()
         self.bullet_overlay.hide_overlay()
+        self.sniper_crosshair_overlay.hide_overlay()
         for component in self.runtime.components.values():
             component.set_status_callback(lambda *_args, **_kwargs: None)
         self.runtime.stop_all()

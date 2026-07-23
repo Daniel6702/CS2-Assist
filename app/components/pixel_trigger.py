@@ -128,6 +128,10 @@ def trigger_pixel_sampling_active(*, automation_permitted: bool, key_is_held: bo
     return automation_permitted and key_is_held
 
 
+def pixel_trigger_automation_active(*, pixel_trigger_enabled: bool, runtime_gate_open: bool, key_is_held: bool) -> bool:
+    return pixel_trigger_enabled and runtime_gate_open and key_is_held
+
+
 def visual_scope_detection_active(
     *,
     trigger_active: bool,
@@ -345,7 +349,6 @@ class PixelTriggerComponent(BaseComponent):
             scope_blur_duration_ms=max(0, 0 if raw_scope_blur_ms in (None, "") else int(raw_scope_blur_ms)),
             scope_poll_interval=scope_detection_interval_seconds(self._config),
         )
-
         poll_interval = max(0.0005, cfg.poll_interval) if cfg.poll_interval > 0 else cfg.poll_interval
         cooldown = max(0.02, cfg.cooldown) if cfg.cooldown > 0 else cfg.cooldown
         click_delay = max(0.01, cfg.click_delay) if cfg.click_delay > 0 else cfg.click_delay
@@ -434,18 +437,15 @@ class PixelTriggerComponent(BaseComponent):
                     while not self._stop.is_set():
                         now = time.perf_counter()
                         key_is_held = hold_key in held_keys
-                        trigger_active = trigger_pixel_sampling_active(
-                            automation_permitted=self.automation_permitted(),
+                        pixel_trigger_enabled = bool(self._config.get("enabled", False))
+                        scope_tracking_enabled = bool(self._config.get("scope_tracking_enabled", False))
+                        trigger_active = pixel_trigger_automation_active(
+                            pixel_trigger_enabled=pixel_trigger_enabled,
+                            runtime_gate_open=self.runtime_gate_open(),
                             key_is_held=key_is_held,
                         )
-                        if not trigger_active:
-                            pending_click = False
-                            previous_color = None
-                            time.sleep(poll_interval)
-                            continue
-
                         scope_active = visual_scope_detection_active(
-                            trigger_active=trigger_active,
+                            trigger_active=trigger_active or (scope_tracking_enabled and self.runtime_gate_open()),
                             scope_pixel_configured=scope_detector is not None,
                             current_weapon=self._current_weapon_name(),
                         )
@@ -463,6 +463,12 @@ class PixelTriggerComponent(BaseComponent):
                             next_scope_detection_at = now + cfg.scope_poll_interval
                         elif not scope_active and self.scope_state() is not None:
                             self._set_scope_state(ScopePixelState(is_scoped=None))
+
+                        if not trigger_active:
+                            pending_click = False
+                            previous_color = None
+                            time.sleep(poll_interval)
+                            continue
 
                         abs_x, abs_y = _resolve_pixel_coordinates(now)
                         # Reset previous_color when coordinates change (scope <-> unscoped switch)
@@ -506,8 +512,10 @@ class PixelTriggerComponent(BaseComponent):
                     while not self._stop.is_set():
                         now = time.perf_counter()
                         key_is_held = hold_key in held_keys
-                        trigger_active = trigger_pixel_sampling_active(
-                            automation_permitted=self.automation_permitted(),
+                        pixel_trigger_enabled = bool(self._config.get("enabled", False))
+                        trigger_active = pixel_trigger_automation_active(
+                            pixel_trigger_enabled=pixel_trigger_enabled,
+                            runtime_gate_open=self.runtime_gate_open(),
                             key_is_held=key_is_held,
                         )
                         if not trigger_active:

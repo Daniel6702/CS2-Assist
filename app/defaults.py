@@ -140,6 +140,11 @@ def default_profile() -> dict[str, Any]:
                 "click_hold_ms": 20,
                 "allowed_weapon_file": "./resources/weapons_data/semi-auto_weapon_codes.txt",
             },
+            "sniper_crosshair": {
+                "enabled": False,
+                "crosshair_code": "",
+                "stay_when_scoped": False,
+            },
             "flash_filter": {
                 "enabled": False,
                 "output": "",

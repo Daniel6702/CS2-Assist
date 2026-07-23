@@ -11,6 +11,7 @@ from app.ui.widgets.bomb_timer_section import BombTimerSection
 from app.ui.widgets.defuse_warning_section import DefuseWarningSection
 from app.ui.widgets.flash_filter_section import FlashFilterSection
 from app.ui.widgets.kill_sound_section import KillSoundSection
+from app.ui.widgets.sniper_crosshair_section import SniperCrosshairSection
 
 
 class MiscTab(BaseTab):
@@ -27,6 +28,7 @@ class MiscTab(BaseTab):
         self.defuse_warning = DefuseWarningSection()
         self.auto_accept = AutoAcceptSection()
         self.auto_shoot = AutoShootSection()
+        self.sniper_crosshair = SniperCrosshairSection()
         self.flash_filter = FlashFilterSection()
 
         top_row = QtWidgets.QHBoxLayout()
@@ -38,6 +40,7 @@ class MiscTab(BaseTab):
         auto_accept_row = QtWidgets.QHBoxLayout()
         auto_accept_row.setSpacing(8)
         auto_accept_row.addWidget(self.auto_accept, 1)
+        auto_accept_row.addWidget(self.sniper_crosshair, 1)
         outer.addLayout(auto_accept_row)
 
         timer_row = QtWidgets.QHBoxLayout()
@@ -50,6 +53,7 @@ class MiscTab(BaseTab):
             ("kill_sound", self.kill_sound),
             ("auto_accept", self.auto_accept),
             ("auto_shoot", self.auto_shoot),
+            ("sniper_crosshair", self.sniper_crosshair),
             ("flash_filter", self.flash_filter),
         )
         for section_name, section in sections:
@@ -76,6 +80,7 @@ class MiscTab(BaseTab):
             },
             "auto_accept": self.auto_accept.extract_config(),
             "auto_shoot": self.auto_shoot.extract_config(),
+            "sniper_crosshair": self.sniper_crosshair.extract_config(),
             "flash_filter": self.flash_filter.extract_config(),
         }
 
@@ -86,10 +91,11 @@ class MiscTab(BaseTab):
         section = self._sections()[section_name]
         self.config_changed.emit(section_name, section.extract_config())
 
-    def _sections(self) -> dict[str, KillSoundSection | AutoAcceptSection | AutoShootSection | FlashFilterSection]:
+    def _sections(self) -> dict[str, KillSoundSection | AutoAcceptSection | AutoShootSection | SniperCrosshairSection | FlashFilterSection]:
         return {
             "kill_sound": self.kill_sound,
             "auto_accept": self.auto_accept,
             "auto_shoot": self.auto_shoot,
+            "sniper_crosshair": self.sniper_crosshair,
             "flash_filter": self.flash_filter,
         }

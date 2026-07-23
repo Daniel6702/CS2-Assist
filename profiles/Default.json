@@ -525,6 +525,11 @@
             "enabled": false,
             "waiting_time_seconds": 5.0,
             "click_hold_ms": 24
+        },
+        "sniper_crosshair": {
+            "enabled": true,
+            "crosshair_code": "CSGO-rfwPG-LsaOQ-ERc8q-qiuds-sbK5O",
+            "stay_when_scoped": false
         }
     }
 }

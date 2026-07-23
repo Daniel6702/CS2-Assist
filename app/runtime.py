@@ -8,6 +8,7 @@ from app.components.base import BaseComponent
 from app.components.bhop import BhopComponent
 from app.components.counter_strafe import CounterStrafeComponent
 from app.components import AutoAcceptComponent, AutoAirStrafeComponent, AutoShootComponent, BombTimerComponent, CVTriggerComponent, FlashFilterComponent, JumpThrowComponent, KillSoundComponent, LongJumpComponent
+from app.components.sniper_crosshair import SniperCrosshairComponent
 from app.components.long_jump import CommandBridge
 from app.components.pixel_trigger import PixelTriggerComponent
 from app.components.recoil import RecoilComponent
@@ -42,6 +43,7 @@ class RuntimeManager:
             "bomb_timer": BombTimerComponent(),
             "auto_accept": AutoAcceptComponent(),
             "auto_shoot": AutoShootComponent(),
+            "sniper_crosshair": SniperCrosshairComponent(),
             "flash_filter": FlashFilterComponent(),
         }
         for component in self.components.values():
@@ -91,6 +93,7 @@ class RuntimeManager:
             }
 
         if name == "pixel_trigger":
+            sniper_crosshair_cfg = dict(components_cfg.get("sniper_crosshair", {}) or {})
             cfg["game_resolution"] = {
                 "width": max(1, int(game_resolution.get("width", 1600) or 1600)),
                 "height": max(1, int(game_resolution.get("height", 1200) or 1200)),
@@ -102,11 +105,33 @@ class RuntimeManager:
             cfg["game_resolution_stretched"] = bool(
                 shared.get("game_resolution_stretched", cfg.get("stretched", True)),
             )
+            cfg["scope_tracking_enabled"] = bool(sniper_crosshair_cfg.get("enabled", False))
 
         if name == "auto_accept" and self._cs2_log_path_provider is not None:
             path = self._cs2_log_path_provider()
             if path is not None:
                 cfg["console_log_path"] = str(path)
+
+        if name == "sniper_crosshair":
+            pixel_trigger_cfg = dict(components_cfg.get("pixel_trigger", {}) or {})
+            pixel_trigger = self.components.get("pixel_trigger")
+            scope_state_provider = getattr(pixel_trigger, "scope_state", None)
+            sniper_code = str(cfg.get("crosshair_code", "") or "").strip()
+            pixel_code = str(pixel_trigger_cfg.get("crosshair_code", "") or "").strip()
+            cfg["crosshair_code"] = sniper_code or pixel_code
+            if callable(scope_state_provider):
+                cfg["scope_state_provider"] = scope_state_provider
+            cfg["game_resolution"] = {
+                "width": max(1, int(game_resolution.get("width", 1920) or 1920)),
+                "height": max(1, int(game_resolution.get("height", 1080) or 1080)),
+            }
+            cfg["display_resolution"] = {
+                "width": max(1, int(display_resolution.get("width", 1920) or 1920)),
+                "height": max(1, int(display_resolution.get("height", 1080) or 1080)),
+            }
+            cfg["game_resolution_stretched"] = bool(
+                shared.get("game_resolution_stretched", pixel_trigger_cfg.get("stretched", True)),
+            )
 
         if name == "cv_trigger":
             cfg["user_sens"] = game_sensitivity
@@ -176,6 +201,9 @@ class RuntimeManager:
         for name, component in self.components.items():
             cfg = components_cfg.get(name, {})
             should_run = bool(cfg.get("enabled", False))
+            if name == "pixel_trigger":
+                sniper_crosshair_cfg = components_cfg.get("sniper_crosshair", {})
+                should_run = should_run or bool(sniper_crosshair_cfg.get("enabled", False))
             if should_run and not component.enabled:
                 component.start()
             elif not should_run and component.enabled:
@@ -185,6 +213,9 @@ class RuntimeManager:
         component = self.components[name]
         cfg = self._effective_component_config(profile, name)
         now_enabled = bool(cfg.get("enabled", False))
+        if name == "pixel_trigger":
+            sniper_crosshair_cfg = (profile.get("components", {}) or {}).get("sniper_crosshair", {})
+            now_enabled = now_enabled or bool(sniper_crosshair_cfg.get("enabled", False))
 
         if name == "cv_trigger" and component.enabled and now_enabled:
             component.stop()

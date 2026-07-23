@@ -18,6 +18,7 @@ from app.components.pixel_trigger import (  # noqa: E402
     ScopeBlurConfig,
     ScopePixelState,
     trigger_pixel_sampling_active,
+    pixel_trigger_automation_active,
     visual_scope_detection_active,
     scope_detection_interval_seconds,
     update_scope_blur_state,
@@ -110,6 +111,22 @@ class PixelTriggerScopeTests(unittest.TestCase):
         self.assertFalse(trigger_pixel_sampling_active(automation_permitted=False, key_is_held=True))
         self.assertFalse(trigger_pixel_sampling_active(automation_permitted=True, key_is_held=False))
         self.assertTrue(trigger_pixel_sampling_active(automation_permitted=True, key_is_held=True))
+
+    def test_pixel_trigger_clicking_requires_pixel_trigger_enabled_even_when_thread_runs_for_scope(self) -> None:
+        self.assertFalse(
+            pixel_trigger_automation_active(
+                pixel_trigger_enabled=False,
+                runtime_gate_open=True,
+                key_is_held=True,
+            ),
+        )
+        self.assertTrue(
+            pixel_trigger_automation_active(
+                pixel_trigger_enabled=True,
+                runtime_gate_open=True,
+                key_is_held=True,
+            ),
+        )
 
     def test_visual_scope_detection_requires_active_scope_pixel_and_sniper_weapon(self) -> None:
         self.assertFalse(
