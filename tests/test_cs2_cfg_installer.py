@@ -4,6 +4,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tests.optional_dependency_stubs import install_mss_stub, install_pynput_stub
+
+install_mss_stub()
+install_pynput_stub()
+
 from app.cs2_integration.cfg_installer import (
     AUTOEXEC_BLOCK_BEGIN,
     AUTOEXEC_BLOCK_END,
@@ -47,6 +52,17 @@ class CfgInstallerTests(unittest.TestCase):
             self.assertEqual(len(result.command_slot_paths), COMMAND_SLOT_COUNT)
             self.assertEqual(result.command_slot_paths[0].name, "cs2assist_cmd_01.cfg")
             self.assertEqual(result.command_slot_paths[-1].name, "cs2assist_cmd_12.cfg")
+
+    def test_install_cfg_files_enables_console_logging_in_managed_autoexec_block(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = self._valid_game_root(Path(temp_dir))
+
+            result = install_cfg_files(root)
+
+            autoexec_text = result.autoexec_path.read_text()
+            self.assertIn("conclearlog", autoexec_text)
+            self.assertIn("condebug", autoexec_text)
+            self.assertIn("exec cs2assist_bootstrap", autoexec_text)
 
     def test_install_cfg_files_preserves_autoexec_and_creates_single_backup(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

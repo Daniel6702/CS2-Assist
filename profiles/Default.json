@@ -520,6 +520,11 @@
         "long_jump": {
             "enabled": false,
             "key_name": "g"
+        },
+        "auto_accept": {
+            "enabled": false,
+            "waiting_time_seconds": 5.0,
+            "click_hold_ms": 24
         }
     }
 }

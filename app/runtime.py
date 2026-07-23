@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
 from typing import Any, Callable
 
 from app.components.base import BaseComponent
 from app.components.bhop import BhopComponent
 from app.components.counter_strafe import CounterStrafeComponent
-from app.components import AutoAirStrafeComponent, AutoShootComponent, BombTimerComponent, CVTriggerComponent, FlashFilterComponent, JumpThrowComponent, KillSoundComponent, LongJumpComponent
+from app.components import AutoAcceptComponent, AutoAirStrafeComponent, AutoShootComponent, BombTimerComponent, CVTriggerComponent, FlashFilterComponent, JumpThrowComponent, KillSoundComponent, LongJumpComponent
 from app.components.long_jump import CommandBridge
 from app.components.pixel_trigger import PixelTriggerComponent
 from app.components.recoil import RecoilComponent
@@ -19,8 +20,14 @@ _SYSTEM_MODES = frozenset({"on", "off", "gsi"})
 
 
 class RuntimeManager:
-    def __init__(self, status_callback: Callable[[str, str], None], command_bridge: CommandBridge | None = None) -> None:
+    def __init__(
+        self,
+        status_callback: Callable[[str, str], None],
+        command_bridge: CommandBridge | None = None,
+        cs2_log_path_provider: Callable[[], Path | None] | None = None,
+    ) -> None:
         self.status_callback = status_callback
+        self._cs2_log_path_provider = cs2_log_path_provider
         self.components: dict[str, BaseComponent] = {
             "bhop": BhopComponent(),
             "snap_tap": SnapTapComponent(),
@@ -33,6 +40,7 @@ class RuntimeManager:
             "cv_trigger": CVTriggerComponent(),
             "kill_sound": KillSoundComponent(),
             "bomb_timer": BombTimerComponent(),
+            "auto_accept": AutoAcceptComponent(),
             "auto_shoot": AutoShootComponent(),
             "flash_filter": FlashFilterComponent(),
         }
@@ -94,6 +102,11 @@ class RuntimeManager:
             cfg["game_resolution_stretched"] = bool(
                 shared.get("game_resolution_stretched", cfg.get("stretched", True)),
             )
+
+        if name == "auto_accept" and self._cs2_log_path_provider is not None:
+            path = self._cs2_log_path_provider()
+            if path is not None:
+                cfg["console_log_path"] = str(path)
 
         if name == "cv_trigger":
             cfg["user_sens"] = game_sensitivity

@@ -103,7 +103,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.log_bridge = LogBridge()
         self.log_bridge.message.connect(self._append_log)
         self.command_bridge = command_bridge
-        self.runtime = RuntimeManager(status_callback=self._runtime_status, command_bridge=command_bridge)
+        self.runtime = RuntimeManager(
+            status_callback=self._runtime_status,
+            command_bridge=command_bridge,
+            cs2_log_path_provider=self._cs2_console_log_path_from_settings,
+        )
         self.hotkeys = HotkeyBridge(self)
         self.hotkeys.activated.connect(self._on_hotkey_activated)
         self.bullet_overlay = BulletImpactOverlay()
@@ -406,6 +410,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.cv_trigger_tab.load_config(deep_get(self.current_profile_data, "components.cv_trigger", {}))
             self.misc_tab.load_config("kill_sound", deep_get(self.current_profile_data, "components.kill_sound", {}))
             self.misc_tab.load_config("bomb_timer", deep_get(self.current_profile_data, "components.bomb_timer", {}))
+            self.misc_tab.load_config("auto_accept", deep_get(self.current_profile_data, "components.auto_accept", {}))
             self.misc_tab.load_config("auto_shoot", deep_get(self.current_profile_data, "components.auto_shoot", {}))
             self.misc_tab.load_config("flash_filter", deep_get(self.current_profile_data, "components.flash_filter", {}))
             self._movement_hotkey_disabled.clear()
@@ -438,6 +443,17 @@ class MainWindow(QtWidgets.QMainWindow):
             return None
         return CS2CommandBridge(cfg_dir_for_game_root(root))
 
+    def _cs2_console_log_path_from_settings(self) -> Path | None:
+        settings = load_settings()
+        if not settings.cs2_game_root:
+            return None
+        root = Path(settings.cs2_game_root)
+        try:
+            validate_game_root(root)
+        except InvalidGameRootError:
+            return None
+        return root / "game" / "csgo" / "console.log"
+
     def _change_game_directory(self) -> None:
         dialog = CS2SetupDialog(parent=self)
         if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
@@ -447,8 +463,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self._append_log("app", "[ERROR] CS2 game directory was saved, but the command bridge could not be created.")
             return
         long_jump_was_enabled = bool(deep_get(self.current_profile_data, "components.long_jump.enabled", False))
+        auto_accept_was_enabled = bool(deep_get(self.current_profile_data, "components.auto_accept.enabled", False))
         if long_jump_was_enabled:
             self.runtime.components["long_jump"].stop()
+        if auto_accept_was_enabled:
+            self.runtime.components["auto_accept"].stop()
         old_bridge = self.command_bridge
         self.command_bridge = new_bridge
         self.runtime.set_command_bridge(new_bridge)
@@ -456,6 +475,8 @@ class MainWindow(QtWidgets.QMainWindow):
             old_bridge.close()
         if long_jump_was_enabled:
             self.runtime.restart_component("long_jump", self.current_profile_data)
+        if auto_accept_was_enabled:
+            self.runtime.restart_component("auto_accept", self.current_profile_data)
         self._append_log("app", "[INFO] CS2 game directory updated.")
 
     def apply_all_runtime(self) -> None:

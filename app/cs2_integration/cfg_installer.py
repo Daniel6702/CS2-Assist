@@ -82,6 +82,8 @@ def _managed_autoexec_block() -> str:
     return "\n".join(
         (
             AUTOEXEC_BLOCK_BEGIN,
+            "conclearlog",
+            "condebug",
             f"exec {Path(BOOTSTRAP_CFG_NAME).stem}",
             AUTOEXEC_BLOCK_END,
         ),

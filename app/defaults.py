@@ -129,6 +129,11 @@ def default_profile() -> dict[str, Any]:
                 "warning_5s_file": "",
                 "warning_5s_volume": 50,
             },
+            "auto_accept": {
+                "enabled": False,
+                "waiting_time_seconds": 5.0,
+                "click_hold_ms": 24,
+            },
             "auto_shoot": {
                 "enabled": False,
                 "clicks_per_second": 8.0,

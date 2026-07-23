@@ -150,6 +150,9 @@ activemq-data/
 *.sage.py
 
 # Environments
+cs2-ErScripts
+cs2-ErScripts/
+/cs2-ErScripts
 ./cs2-ErScripts
 .cs2-ErScripts
 .cs2-ErScripts/
