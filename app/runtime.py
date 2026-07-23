@@ -15,6 +15,9 @@ from app.gsi import GSIServer, GameState
 from app.platform.monitor import default_monitor_geometry
 
 
+_SYSTEM_MODES = frozenset({"on", "off", "gsi"})
+
+
 class RuntimeManager:
     def __init__(self, status_callback: Callable[[str, str], None], command_bridge: CommandBridge | None = None) -> None:
         self.status_callback = status_callback
@@ -40,6 +43,7 @@ class RuntimeManager:
         self._gsi_gate_open = False
         self._gsi_gate_reason = "waiting_for_gsi"
         self._gsi_connected = False
+        self._system_mode = "gsi"
 
     def _effective_component_config(self, profile: dict[str, Any], name: str) -> dict[str, Any]:
         components_cfg = profile.get("components", {}) or {}
@@ -134,6 +138,15 @@ class RuntimeManager:
         if changed:
             self.status_callback("gsi_shutoff", "Active" if open_ else "Inactive")
 
+    def _set_system_mode_gate(self) -> None:
+        if self._system_mode == "on":
+            self._set_runtime_gate(True, "")
+            return
+        if self._system_mode == "off":
+            self._set_runtime_gate(False, "manual_off")
+            return
+        self._set_runtime_gate(False, "waiting_for_gsi")
+
     def set_command_bridge(self, command_bridge: CommandBridge | None) -> None:
         component = self.components["long_jump"]
         if isinstance(component, LongJumpComponent):
@@ -190,14 +203,16 @@ class RuntimeManager:
     def configure_gsi(self, gsi_cfg: dict[str, Any]) -> None:
         host = str(gsi_cfg.get("host", "127.0.0.1"))
         port = int(gsi_cfg.get("port", 3000))
+        mode = str(gsi_cfg.get("mode", "gsi")).strip().lower()
+        self._system_mode = mode if mode in _SYSTEM_MODES else "gsi"
 
         if self.gsi_server is not None:
             self.gsi_server.stop()
             self.gsi_server = None
 
         self._set_gsi_connection_status(False, force=True)
-        self._set_runtime_gate(False, "waiting_for_gsi")
-        self.status_callback("gsi_shutoff", "Inactive")
+        self._set_system_mode_gate()
+        self.status_callback("gsi_shutoff", "Active" if self._gsi_gate_open else "Inactive")
 
         try:
             self.gsi_server = GSIServer(host=host, port=port)
@@ -210,13 +225,15 @@ class RuntimeManager:
             )
         except Exception as exc:
             self.gsi_server = None
-            self._set_runtime_gate(False, "gsi_unavailable")
+            if self._system_mode != "on":
+                self._set_runtime_gate(False, "gsi_unavailable")
             self.status_callback("gsi", f"[ERROR] Failed to start GSI server: {exc}")
 
     def on_gsi_state(self, state: GameState) -> None:
         allowed = bool(state.features_allowed)
         reason = "" if allowed else state.shutoff_reason or "gsi_shutoff"
-        self._set_runtime_gate(allowed, reason)
+        if self._system_mode == "gsi":
+            self._set_runtime_gate(allowed, reason)
 
         self.status_callback(
             "gsi",

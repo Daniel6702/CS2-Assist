@@ -205,6 +205,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.shared_settings_tab.shared_display_height.valueChanged.connect(self._on_shared_settings_changed)
         self.shared_settings_tab.gsi_host.editingFinished.connect(self._on_gsi_changed)
         self.shared_settings_tab.gsi_port.valueChanged.connect(self._on_gsi_changed)
+        self.shared_settings_tab.gsi_system_mode.idClicked.connect(lambda _mode_id: self._on_gsi_changed())
         self.shared_settings_tab.hotkey_cv_trigger.editingFinished.connect(self._on_hotkeys_changed)
         self.shared_settings_tab.hotkey_recoil.editingFinished.connect(self._on_hotkeys_changed)
         self.shared_settings_tab.hotkey_pixel_trigger.editingFinished.connect(self._on_hotkeys_changed)

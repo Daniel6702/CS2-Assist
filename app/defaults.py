@@ -19,6 +19,7 @@ def default_profile() -> dict[str, Any]:
             "gsi": {
                 "host": "127.0.0.1",
                 "port": 3000,
+                "mode": "gsi",
             },
             "shared": {
                 "keyboard_device_path": "",

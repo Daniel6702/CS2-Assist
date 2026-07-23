@@ -120,7 +120,8 @@ Profiles are stored as JSON files under `profiles/`. The included `profiles/Defa
     "app": {
         "gsi": {
             "host": "127.0.0.1",
-            "port": 3000
+            "port": 3000,
+            "mode": "gsi"
         },
         "shared": {
             "keyboard_device_path": "/dev/input/event3",
@@ -162,8 +163,9 @@ GSI settings live at `app.gsi` in each profile.
 
 - `host`: default `127.0.0.1`.
 - `port`: default `3000`.
+- `mode`: `on`, `off`, or `gsi`. `on` forces systems active, `off` forces systems inactive, and `gsi` follows live/dead GSI state.
 
-GSI is always on because the app-wide shutoff switch depends on it. `RuntimeManager` keeps every system gated until GSI reports a live round with the local player alive. The shutoff switch activates when the round is not live or when the local player is dead during a live round. `GSIServer` accepts JSON POST requests, marks the connection as active after any handled request, parses weapon, ammo, health, round phase, and map data into `GameState`, then dispatches that state to components.
+GSI is always on because the app-wide system switch can use it. In `gsi` mode, `RuntimeManager` keeps every system gated until GSI reports a live round with the local player alive. In `on` mode, systems are forced active; in `off` mode, systems are forced inactive. `GSIServer` accepts JSON POST requests, marks the connection as active after any handled request, parses weapon, ammo, health, round phase, and map data into `GameState`, then dispatches that state to components.
 
 ### CS2 cfg setup
 

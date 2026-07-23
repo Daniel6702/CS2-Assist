@@ -73,7 +73,16 @@ class SharedSettingsTabTests(unittest.TestCase):
         extracted = tab.extract_config()
 
         self.assertFalse(hasattr(tab, "gsi_enabled"))
-        self.assertEqual(extracted["gsi"], {"host": "0.0.0.0", "port": 4123})
+        self.assertEqual(extracted["gsi"], {"host": "0.0.0.0", "port": 4123, "mode": "gsi"})
+
+    def test_gsi_system_mode_round_trips_from_switch(self) -> None:
+        tab = SharedSettingsTab(DeviceService())
+        tab.load_config({"gsi": {"mode": "off", "host": "127.0.0.1", "port": 3000}})
+
+        extracted = tab.extract_config()
+
+        self.assertEqual(tab.gsi_system_mode_value(), "off")
+        self.assertEqual(extracted["gsi"]["mode"], "off")
 
     def test_gsi_status_indicators_update_text(self) -> None:
         tab = SharedSettingsTab(DeviceService())

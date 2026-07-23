@@ -5,50 +5,39 @@ from typing import Any
 from PySide6 import QtWidgets
 
 from app.ui.tabs.base import BaseTab
-
-
-_ACTIVE_STATUS_STYLE = "color: #4ade80;"
-_INACTIVE_STATUS_STYLE = "color: #ef4444;"
+from app.ui.widgets.gsi_controls import GSIControlsWidget
 
 
 class GSITab(BaseTab):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
 
-        layout = QtWidgets.QFormLayout(self)
-
-        self.gsi_host = QtWidgets.QLineEdit()
-        layout.addRow("Host", self.gsi_host)
-
-        self.gsi_port = QtWidgets.QSpinBox()
-        self.gsi_port.setRange(1, 65535)
-        layout.addRow("Port", self.gsi_port)
-
-        self.gsi_connection_status = QtWidgets.QLabel("Waiting for connection ...")
-        layout.addRow("Status", self.gsi_connection_status)
-
-        self.gsi_system_status = QtWidgets.QLabel("Inactive")
-        self.gsi_system_status.setStyleSheet(_INACTIVE_STATUS_STYLE)
-        layout.addRow("System", self.gsi_system_status)
+        layout = QtWidgets.QVBoxLayout(self)
+        self.gsi_controls = GSIControlsWidget()
+        self.gsi_host = self.gsi_controls.host
+        self.gsi_port = self.gsi_controls.port
+        self.gsi_system_mode = self.gsi_controls.system_mode
+        self.gsi_connection_status = self.gsi_controls.connection_status
+        self.gsi_system_status = self.gsi_controls.system_status
+        layout.addWidget(self.gsi_controls)
 
     def set_last_state(self, message: str) -> None:
         return
 
     def set_gsi_connection_status(self, connected: bool) -> None:
-        self.gsi_connection_status.setText("Connected" if connected else "Waiting for connection ...")
+        self.gsi_controls.set_connection_status(connected)
 
     def set_gsi_system_active(self, active: bool) -> None:
-        self.gsi_system_status.setText("Active" if active else "Inactive")
-        self.gsi_system_status.setStyleSheet(_ACTIVE_STATUS_STYLE if active else _INACTIVE_STATUS_STYLE)
+        self.gsi_controls.set_system_active(active)
+
+    def set_gsi_system_mode(self, mode: str) -> None:
+        self.gsi_controls.set_system_mode(mode)
+
+    def gsi_system_mode_value(self) -> str:
+        return self.gsi_controls.system_mode_value()
 
     def load_config(self, config: dict[str, Any]) -> None:
-        self.gsi_host.setText(str(config.get("host", "127.0.0.1")))
-        self.gsi_port.setValue(int(config.get("port", 3000)))
-        self.set_gsi_connection_status(False)
-        self.set_gsi_system_active(False)
+        self.gsi_controls.load_config(config)
 
     def extract_config(self) -> dict[str, Any]:
-        return {
-            "host": self.gsi_host.text().strip() or "127.0.0.1",
-            "port": self.gsi_port.value(),
-        }
+        return self.gsi_controls.extract_config()
