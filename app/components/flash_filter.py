@@ -195,6 +195,12 @@ class FlashFilterComponent(BaseComponent):
         flash_filter = self._filter
         if flash_filter is None or state.flashed is None:
             return
+        if not self.automation_permitted():
+            try:
+                flash_filter.set_flashed(False)
+            except (OSError, XrandrError) as exc:
+                self.status(f"XRandR update failed: {exc}", "error")
+            return
         try:
             flash_filter.set_flashed(state.flashed)
         except (OSError, XrandrError) as exc:

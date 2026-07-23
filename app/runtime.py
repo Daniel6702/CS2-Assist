@@ -37,9 +37,9 @@ class RuntimeManager:
             component.set_status_callback(self.status_callback)
 
         self.gsi_server: GSIServer | None = None
-        self._gsi_enabled = False
         self._gsi_gate_open = False
-        self._gsi_gate_reason = "waiting_for_alive_gsi"
+        self._gsi_gate_reason = "waiting_for_gsi"
+        self._gsi_connected = False
 
     def _effective_component_config(self, profile: dict[str, Any], name: str) -> dict[str, Any]:
         components_cfg = profile.get("components", {}) or {}
@@ -119,6 +119,21 @@ class RuntimeManager:
         for component in self.components.values():
             component.set_runtime_gate(self._gsi_gate_open, self._gsi_gate_reason)
 
+    def _set_gsi_connection_status(self, connected: bool, *, force: bool = False) -> None:
+        if not force and self._gsi_connected == connected:
+            return
+        self._gsi_connected = connected
+        message = "Connected" if connected else "Waiting for connection ..."
+        self.status_callback("gsi_connection", message)
+
+    def _set_runtime_gate(self, open_: bool, reason: str) -> None:
+        changed = self._gsi_gate_open != open_ or self._gsi_gate_reason != reason
+        self._gsi_gate_open = open_
+        self._gsi_gate_reason = reason
+        self._apply_runtime_gate()
+        if changed:
+            self.status_callback("gsi_shutoff", "Active" if open_ else "Inactive")
+
     def set_command_bridge(self, command_bridge: CommandBridge | None) -> None:
         component = self.components["long_jump"]
         if isinstance(component, LongJumpComponent):
@@ -173,7 +188,6 @@ class RuntimeManager:
             self.gsi_server = None
 
     def configure_gsi(self, gsi_cfg: dict[str, Any]) -> None:
-        enabled = bool(gsi_cfg.get("enabled", True))
         host = str(gsi_cfg.get("host", "127.0.0.1"))
         port = int(gsi_cfg.get("port", 3000))
 
@@ -181,48 +195,32 @@ class RuntimeManager:
             self.gsi_server.stop()
             self.gsi_server = None
 
-        self._gsi_enabled = enabled
-        if not enabled:
-            self._gsi_gate_open = True
-            self._gsi_gate_reason = ""
-            self._apply_runtime_gate()
-            self.status_callback("gsi", "[INFO] GSI disabled. Runtime gate is open.")
-            return
-
-        # When GSI is enabled, features must remain disabled until GSI has
-        # explicitly confirmed that the player is alive.
-        self._gsi_gate_open = False
-        self._gsi_gate_reason = "waiting_for_alive_gsi"
-        self._apply_runtime_gate()
+        self._set_gsi_connection_status(False, force=True)
+        self._set_runtime_gate(False, "waiting_for_gsi")
+        self.status_callback("gsi_shutoff", "Inactive")
 
         try:
             self.gsi_server = GSIServer(host=host, port=port)
             self.gsi_server.add_listener(self.on_gsi_state)
+            self.gsi_server.add_connection_listener(lambda: self._set_gsi_connection_status(True))
             self.gsi_server.start()
             self.status_callback(
                 "gsi",
-                f"[INFO] GSI listening on http://{host}:{port}. Features stay disabled until GSI confirms the player is alive.",
+                f"[INFO] GSI listening on http://{host}:{port}. Systems stay shut off until GSI reports live play with the local player alive.",
             )
         except Exception as exc:
             self.gsi_server = None
-            self._gsi_gate_open = False
-            self._gsi_gate_reason = "waiting_for_alive_gsi"
-            self._apply_runtime_gate()
+            self._set_runtime_gate(False, "gsi_unavailable")
             self.status_callback("gsi", f"[ERROR] Failed to start GSI server: {exc}")
 
     def on_gsi_state(self, state: GameState) -> None:
         allowed = bool(state.features_allowed)
-        reason = "" if allowed else "player_dead"
-        if self._gsi_enabled and (allowed != self._gsi_gate_open or reason != self._gsi_gate_reason):
-            self._gsi_gate_open = allowed
-            self._gsi_gate_reason = reason
-            self._apply_runtime_gate()
-            gate_text = "OPEN" if allowed else "CLOSED"
-            self.status_callback("gsi", f"[INFO] Runtime gate {gate_text}.")
+        reason = "" if allowed else state.shutoff_reason or "gsi_shutoff"
+        self._set_runtime_gate(allowed, reason)
 
         self.status_callback(
             "gsi",
-            f"[INFO] weapon={state.current_weapon} ammo={state.ammo_clip}/{state.ammo_clip_max} alive={state.player_alive} phase={state.round_phase} allowed={state.features_allowed} scoped={state.is_scoped}",
+            f"[INFO] weapon={state.current_weapon} ammo={state.ammo_clip}/{state.ammo_clip_max} local={state.local_status} phase={state.round_phase} allowed={state.features_allowed} scoped={state.is_scoped}",
         )
         for component in self.components.values():
             try:

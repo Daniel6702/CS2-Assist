@@ -113,6 +113,13 @@ class BombTimerComponent(BaseComponent):
             if prev_phase != "live" and state.round_phase == "live":
                 self._live_since = time.monotonic()
 
+    def on_runtime_gate_changed(self, open_: bool, reason: str) -> None:
+        if open_:
+            return
+        with self._lock:
+            self._bomb_planted = False
+            self._remaining = 0
+
     # ---- external state poll (called from MainWindow tick) ---------------
 
     def get_state(self) -> dict[str, Any]:
@@ -145,9 +152,12 @@ class BombTimerComponent(BaseComponent):
                     round_phase = self._round_phase
                     live_since = self._live_since
 
+                if not self.automation_permitted():
+                    consecutive_red = 0
+                    time.sleep(_POLL_INTERVAL)
+                    continue
+
                 if not bomb_planted:
-                    # Skip scan during freezetime / round over
-                    # (None = GSI disabled → allow scanning)
                     if round_phase is not None and round_phase != "live":
                         consecutive_red = 0
                         time.sleep(_POLL_INTERVAL)

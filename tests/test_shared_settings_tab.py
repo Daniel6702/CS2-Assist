@@ -66,6 +66,30 @@ class SharedSettingsTabTests(unittest.TestCase):
 
         self.assertEqual(calls, [True])
 
+    def test_gsi_enable_toggle_is_not_exposed_or_extracted(self) -> None:
+        tab = SharedSettingsTab(DeviceService())
+        tab.load_config({"gsi": {"enabled": False, "host": "0.0.0.0", "port": 4123}})
+
+        extracted = tab.extract_config()
+
+        self.assertFalse(hasattr(tab, "gsi_enabled"))
+        self.assertEqual(extracted["gsi"], {"host": "0.0.0.0", "port": 4123})
+
+    def test_gsi_status_indicators_update_text(self) -> None:
+        tab = SharedSettingsTab(DeviceService())
+
+        tab.set_gsi_connection_status(True)
+        tab.set_gsi_system_active(True)
+
+        self.assertEqual(tab.gsi_connection_status.text(), "Connected")
+        self.assertEqual(tab.gsi_system_status.text(), "Active")
+        self.assertIn("#4ade80", tab.gsi_system_status.styleSheet())
+
+        tab.set_gsi_system_active(False)
+
+        self.assertEqual(tab.gsi_system_status.text(), "Inactive")
+        self.assertIn("#ef4444", tab.gsi_system_status.styleSheet())
+
 
 if __name__ == "__main__":
     _ = unittest.main()

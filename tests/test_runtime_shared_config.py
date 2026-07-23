@@ -9,6 +9,9 @@ install_mss_stub()
 install_pynput_stub()
 
 from app.components.base import BaseComponent
+from app.components.bomb_timer import BombTimerComponent
+from app.components.kill_sound import KillSoundComponent
+from app.gsi import GameState
 from app.components.long_jump import LongJumpComponent
 from app.platform.monitor import MonitorGeometry
 from app.runtime import RuntimeManager
@@ -168,6 +171,130 @@ class RuntimeSharedConfigTests(unittest.TestCase):
         for name, cfg in configs.items():
             with self.subTest(component=name):
                 self.assertNotIn("_safety", cfg)
+
+    def test_configure_gsi_always_starts_server_and_keeps_shutoff_active_until_state(self) -> None:
+        class FakeGSIServer:
+            def __init__(self, host: str, port: int) -> None:
+                self.host = host
+                self.port = port
+                self.started = False
+                self.listener = None
+                self.connection_listener = None
+
+            def add_listener(self, callback) -> None:
+                self.listener = callback
+
+            def add_connection_listener(self, callback) -> None:
+                self.connection_listener = callback
+
+            def start(self) -> None:
+                self.started = True
+
+            def stop(self) -> None:
+                self.started = False
+
+        statuses: list[tuple[str, str]] = []
+        runtime = RuntimeManager(status_callback=lambda source, message: statuses.append((source, message)))
+        probe = BaseComponent()
+        runtime.components = {"probe": probe}
+        fake = FakeGSIServer("127.0.0.1", 3000)
+
+        with patch("app.runtime.GSIServer", return_value=fake):
+            runtime.configure_gsi({"enabled": False, "host": "127.0.0.1", "port": 3000})
+
+        self.assertIs(runtime.gsi_server, fake)
+        self.assertTrue(fake.started)
+        self.assertFalse(probe.runtime_gate_open())
+        self.assertEqual(probe.runtime_gate_reason(), "waiting_for_gsi")
+        self.assertIn(("gsi_connection", "Waiting for connection ..."), statuses)
+        self.assertIn(("gsi_shutoff", "Inactive"), statuses)
+
+    def test_gsi_state_updates_global_shutoff_status(self) -> None:
+        statuses: list[tuple[str, str]] = []
+        runtime = RuntimeManager(status_callback=lambda source, message: statuses.append((source, message)))
+        probe = BaseComponent()
+        runtime.components = {"probe": probe}
+        alive_state = GameState(
+            raw={},
+            current_weapon=None,
+            ammo_clip=None,
+            ammo_clip_max=None,
+            player_alive=True,
+            round_phase="live",
+            map_name=None,
+            features_allowed=True,
+            kills=None,
+            team=None,
+            defusekit=None,
+            is_scoped=None,
+            flashed=None,
+            local_status="Alive",
+            shutoff_reason="",
+        )
+        dead_state = GameState(
+            raw={},
+            current_weapon=None,
+            ammo_clip=None,
+            ammo_clip_max=None,
+            player_alive=False,
+            round_phase="live",
+            map_name=None,
+            features_allowed=False,
+            kills=None,
+            team=None,
+            defusekit=None,
+            is_scoped=None,
+            flashed=None,
+            local_status="Dead",
+            shutoff_reason="player_dead",
+        )
+
+        runtime.on_gsi_state(alive_state)
+        runtime.on_gsi_state(dead_state)
+
+        self.assertFalse(probe.runtime_gate_open())
+        self.assertEqual(probe.runtime_gate_reason(), "player_dead")
+        self.assertIn(("gsi_shutoff", "Active"), statuses)
+        self.assertIn(("gsi_shutoff", "Inactive"), statuses)
+
+    def test_kill_sound_does_not_play_when_global_shutoff_is_active(self) -> None:
+        calls: list[tuple[str, int]] = []
+        component = KillSoundComponent()
+        component.configure({"enabled": True, "sound_file": "kill.wav", "volume": 50})
+        component.start()
+        component._last_kills = 0
+        component.set_runtime_gate(False, "player_dead")
+        state = GameState(
+            raw={},
+            current_weapon=None,
+            ammo_clip=None,
+            ammo_clip_max=None,
+            player_alive=False,
+            round_phase="live",
+            map_name=None,
+            features_allowed=False,
+            kills=1,
+            team=None,
+            defusekit=None,
+            is_scoped=None,
+            flashed=None,
+        )
+
+        with patch.object(KillSoundComponent, "_play", side_effect=lambda path, volume: calls.append((path, volume))):
+            component.on_gsi_state(state)
+
+        self.assertEqual(calls, [])
+
+    def test_bomb_timer_clears_state_when_global_shutoff_activates(self) -> None:
+        component = BombTimerComponent()
+        with component._lock:
+            component._bomb_planted = True
+            component._remaining = 23
+
+        component.set_runtime_gate(False, "round_not_live")
+
+        self.assertEqual(component.get_state()["bomb_planted"], False)
+        self.assertEqual(component.get_state()["remaining"], 0)
 
 
 if __name__ == "__main__":

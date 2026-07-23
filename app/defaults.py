@@ -17,7 +17,6 @@ def default_profile() -> dict[str, Any]:
         "name": "Default",
         "app": {
             "gsi": {
-                "enabled": True,
                 "host": "127.0.0.1",
                 "port": 3000,
             },

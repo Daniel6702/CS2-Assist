@@ -30,6 +30,8 @@ class KillSoundComponent(BaseComponent):
         super().configure(config)
 
     def on_gsi_state(self, state: GameState) -> None:
+        if not self.automation_permitted():
+            return
         new_kills = state.kills
         if new_kills is None:
             return

@@ -9,6 +9,10 @@ from app.platform.monitor import default_monitor_geometry
 from app.ui.tabs.base import BaseTab
 
 
+_ACTIVE_STATUS_STYLE = "color: #4ade80;"
+_INACTIVE_STATUS_STYLE = "color: #ef4444;"
+
+
 class SharedSettingsTab(BaseTab):
     change_game_directory_requested = QtCore.Signal()
 
@@ -92,15 +96,19 @@ class SharedSettingsTab(BaseTab):
         gsi_layout.setHorizontalSpacing(12)
         gsi_layout.setVerticalSpacing(6)
 
-        self.gsi_enabled = QtWidgets.QCheckBox()
-        gsi_layout.addRow("Enabled", self.gsi_enabled)
-
         self.gsi_host = QtWidgets.QLineEdit()
         gsi_layout.addRow("Host", self.gsi_host)
 
         self.gsi_port = QtWidgets.QSpinBox()
         self.gsi_port.setRange(1, 65535)
         gsi_layout.addRow("Port", self.gsi_port)
+
+        self.gsi_connection_status = QtWidgets.QLabel("Waiting for connection ...")
+        gsi_layout.addRow("Status", self.gsi_connection_status)
+
+        self.gsi_system_status = QtWidgets.QLabel("Inactive")
+        self.gsi_system_status.setStyleSheet(_INACTIVE_STATUS_STYLE)
+        gsi_layout.addRow("System", self.gsi_system_status)
 
         shared_gsi_layout.addWidget(gsi_group, 1)
 
@@ -170,6 +178,13 @@ class SharedSettingsTab(BaseTab):
     def set_last_state(self, message: str) -> None:
         pass
 
+    def set_gsi_connection_status(self, connected: bool) -> None:
+        self.gsi_connection_status.setText("Connected" if connected else "Waiting for connection ...")
+
+    def set_gsi_system_active(self, active: bool) -> None:
+        self.gsi_system_status.setText("Active" if active else "Inactive")
+        self.gsi_system_status.setStyleSheet(_ACTIVE_STATUS_STYLE if active else _INACTIVE_STATUS_STYLE)
+
     def load_config(self, config: dict[str, Any]) -> None:
         # shared settings
         shared = config.get("shared", {})
@@ -196,9 +211,10 @@ class SharedSettingsTab(BaseTab):
 
         # GSI settings
         gsi = config.get("gsi", {})
-        self.gsi_enabled.setChecked(bool(gsi.get("enabled", True)))
         self.gsi_host.setText(str(gsi.get("host", "127.0.0.1")))
         self.gsi_port.setValue(int(gsi.get("port", 3000)))
+        self.set_gsi_connection_status(False)
+        self.set_gsi_system_active(False)
 
         hotkeys = config.get("hotkeys", {})
         self.hotkey_cv_trigger.setText(str(hotkeys.get("cv_trigger", "F1") or "F1"))
@@ -224,7 +240,6 @@ class SharedSettingsTab(BaseTab):
                 },
             },
             "gsi": {
-                "enabled": self.gsi_enabled.isChecked(),
                 "host": self.gsi_host.text().strip() or "127.0.0.1",
                 "port": self.gsi_port.value(),
             },

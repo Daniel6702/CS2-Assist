@@ -85,7 +85,7 @@ sudo usermod -aG input "$USER"
 
 Log out and back in after changing group membership.
 
-Configure CS2 GSI to send JSON POST requests to the host and port shown in the GSI tab. The default profile uses:
+Configure CS2 GSI to send JSON POST requests to the host and port shown in Shared Settings. The default profile uses:
 
 ```text
 http://127.0.0.1:3000
@@ -105,7 +105,7 @@ In the GUI:
 
 1. Choose or create a profile from the top bar.
 2. Select a keyboard input device in Shared Settings, or leave it on auto-detect.
-3. Configure GSI host/port if GSI is enabled.
+3. Configure the GSI host/port if needed.
 4. Enable and tune individual component tabs.
 5. Click `Save` to persist the profile and `Apply` to restart runtime configuration.
 6. Use `Stop All` to stop running components and the GSI server.
@@ -119,7 +119,6 @@ Profiles are stored as JSON files under `profiles/`. The included `profiles/Defa
     "name": "Default",
     "app": {
         "gsi": {
-            "enabled": true,
             "host": "127.0.0.1",
             "port": 3000
         },
@@ -161,13 +160,10 @@ Shared settings live at `app.shared` in each profile.
 
 GSI settings live at `app.gsi` in each profile.
 
-- `enabled`: starts or disables the local GSI server.
 - `host`: default `127.0.0.1`.
 - `port`: default `3000`.
 
-When GSI is enabled, `RuntimeManager` keeps automation gated until GSI reports that the player is alive. `GSIServer` accepts JSON POST requests, parses weapon, ammo, health, round phase, and map data into `GameState`, then dispatches that state to components.
-
-When GSI is disabled, the runtime gate is opened without waiting for GSI state.
+GSI is always on because the app-wide shutoff switch depends on it. `RuntimeManager` keeps every system gated until GSI reports a live round with the local player alive. The shutoff switch activates when the round is not live or when the local player is dead during a live round. `GSIServer` accepts JSON POST requests, marks the connection as active after any handled request, parses weapon, ammo, health, round phase, and map data into `GameState`, then dispatches that state to components.
 
 ### CS2 cfg setup
 
@@ -219,9 +215,10 @@ PYTHONPATH=. python tests/test_runtime_shared_config.py -v
 
 - `app/main.py`: GUI entrypoint. Creates `QApplication`, runs CS2 setup when needed, applies style, constructs `MainWindow`, and starts the event loop.
 - `app/cs2_integration/`: validates CS2 game roots, installs cfg files, stores app-level setup settings, and writes command-slot cfg files for console command execution.
-- `app/ui/main_window.py`: main UI controller. Builds the profile toolbar, tab widget, log view, shared settings tab, GSI tab, and component tabs.
-- `app/runtime.py`: owns `RuntimeManager`, creates component instances, applies profile configuration, starts/stops components, configures GSI, and forwards GSI state.
-- `app/gsi.py`: implements `GSIServer` and `GameState`. The server runs a threaded HTTP listener and handles JSON POST payloads from CS2 GSI.
+- `app/ui/main_window.py`: main UI controller. Builds the profile toolbar, tab widget, log view, shared settings tab, and component tabs.
+- `app/runtime.py`: owns `RuntimeManager`, creates component instances, applies profile configuration, starts/stops components, configures always-on GSI, and forwards GSI state.
+- `app/gsi.py`: implements `GSIServer`. The server runs a threaded HTTP listener and handles JSON POST payloads from CS2 GSI.
+- `app/gsi_state.py`: parses GSI payloads into `GameState` and tracks local-player live/dead state across round transitions.
 - `app/profile_store.py`: implements `ProfileStore` for creating, loading, saving, listing, and deleting JSON profiles.
 - `app/device_service.py`: lists Linux keyboard devices through `evdev` and monitor geometry through `mss`.
 - `app/platform/linux_input.py`: shared Linux keyboard hub built on `evdev` and `uinput`; used by keyboard-filtering components.
@@ -235,7 +232,7 @@ The runtime flow is:
 2. UI widgets edit the profile dictionary.
 3. Saving writes the profile JSON back to `profiles/`.
 4. Applying calls `RuntimeManager.configure_all()`, `RuntimeManager.configure_gsi()`, and `RuntimeManager.apply_enabled_states()`.
-5. `RuntimeManager` starts enabled components and gates automation from GSI state when GSI is enabled.
+5. `RuntimeManager` starts enabled components and gates automation from always-on GSI state.
 
 ## Troubleshooting
 
@@ -259,13 +256,12 @@ Check permissions for `/dev/uinput` and the selected `/dev/input/event*` keyboar
 
 ### GSI not receiving data
 
-The GSI tab shows the last state received from the local GSI server. If it stays at `No data yet.`:
+The Shared Settings GSI box shows `Connected` after the local GSI server handles any request. If it stays at `Waiting for connection ...`:
 
-- Confirm GSI is enabled in the profile.
 - Confirm the host and port match the CS2 GSI configuration.
 - Confirm nothing else is using the configured port.
 - Apply the profile again and check the log for `GSI listening on http://<host>:<port>` or `Failed to start GSI server`.
-- Remember that when GSI is enabled, features stay gated until GSI reports the player is alive.
+- Remember that systems stay shut off until GSI reports a live round with the local player alive.
 
 ### setup says cfg folder not found
 

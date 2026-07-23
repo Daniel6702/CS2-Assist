@@ -2,159 +2,10 @@ from __future__ import annotations
 
 import json
 import threading
-from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Callable
 
-
-def _parse_int(value) -> int | None:
-    if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float):
-        return int(value)
-    if isinstance(value, str):
-        text = value.strip()
-        if text.startswith("-"):
-            body = text[1:]
-            return -int(body) if body.isdigit() else None
-        return int(text) if text.isdigit() else None
-    return None
-
-
-def _parse_boolish(value) -> bool | None:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, int | float):
-        return value != 0
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in ("true", "yes", "on"):
-            return True
-        if normalized in ("false", "no", "off", ""):
-            return False
-        parsed = _parse_int(normalized)
-        return None if parsed is None else parsed != 0
-    return None
-
-
-@dataclass(frozen=True)
-class GameState:
-    raw: dict
-    current_weapon: str | None
-    ammo_clip: int | None
-    ammo_clip_max: int | None
-    player_alive: bool | None
-    round_phase: str | None
-    map_name: str | None
-    features_allowed: bool
-    kills: int | None
-    team: str | None
-    defusekit: bool | None
-    is_scoped: bool | None
-    flashed: bool | None
-
-    @classmethod
-    def from_payload(cls, payload: dict) -> "GameState":
-        player = payload.get("player", {}) or {}
-        player_state = player.get("state", {}) or {}
-        weapons = player.get("weapons", {}) or {}
-        round_info = payload.get("round", {}) or {}
-        map_info = payload.get("map", {}) or {}
-        phase_countdowns = payload.get("phase_countdowns", {}) or {}
-
-        active_weapon_data = None
-        active_weapon_name = None
-        if isinstance(weapons, dict):
-            for _, weapon_data in weapons.items():
-                if isinstance(weapon_data, dict) and weapon_data.get("state") == "active":
-                    active_weapon_data = weapon_data
-                    active_weapon_name = weapon_data.get("name")
-                    break
-            if active_weapon_data is None:
-                for _, weapon_data in weapons.items():
-                    if isinstance(weapon_data, dict):
-                        active_weapon_data = weapon_data
-                        active_weapon_name = weapon_data.get("name")
-                        break
-
-        ammo_clip = None
-        ammo_clip_max = None
-        if isinstance(active_weapon_data, dict):
-            ammo_clip = _parse_int(active_weapon_data.get("ammo_clip"))
-            ammo_clip_max = _parse_int(active_weapon_data.get("ammo_clip_max"))
-
-        health = _parse_int(player_state.get("health"))
-        if health is None:
-            player_alive = None
-        else:
-            player_alive = health > 0
-
-        round_phase = None
-        for value in (
-            round_info.get("phase"),
-            phase_countdowns.get("phase"),
-            map_info.get("phase"),
-        ):
-            if isinstance(value, str) and value.strip():
-                round_phase = value.strip().lower()
-                break
-
-        map_name = map_info.get("name") if isinstance(map_info.get("name"), str) else None
-
-        # Latest requested behavior:
-        # automation stays disabled until GSI explicitly reports that the
-        # player is alive. Unknown / missing state should not enable features.
-        features_allowed = player_alive is True
-
-        team = player.get("team")
-        if isinstance(team, str):
-            team = team.strip().upper()
-
-        defusekit = player_state.get("defusekit")
-        if isinstance(defusekit, bool):
-            defusekit_bool = defusekit
-        elif isinstance(defusekit, str):
-            defusekit_bool = defusekit.strip().lower() in ("true", "1", "yes")
-        else:
-            defusekit_bool = None
-
-        # CS2 sends player.state.scoped (bool).  Fall back to player.state.zoomed
-        # which some CS2 GSI configurations send instead.
-        scoped_raw = player_state.get("scoped")
-        if scoped_raw is None:
-            scoped_raw = player_state.get("zoomed")
-
-        if isinstance(scoped_raw, bool):
-            is_scoped = scoped_raw
-        elif scoped_raw in (0, 1):
-            is_scoped = bool(scoped_raw)
-        elif isinstance(scoped_raw, str):
-            is_scoped = scoped_raw.strip().lower() in ("true", "1", "yes")
-        else:
-            is_scoped = None
-
-        flashed = _parse_boolish(player_state.get("flashed"))
-
-        player_stats = player.get("match_stats", {}) or {}
-        kills = _parse_int(player_stats.get("kills"))
-
-        return cls(
-            raw=payload,
-            current_weapon=active_weapon_name,
-            ammo_clip=ammo_clip,
-            ammo_clip_max=ammo_clip_max,
-            player_alive=player_alive,
-            round_phase=round_phase,
-            map_name=map_name,
-            features_allowed=features_allowed,
-            kills=kills,
-            team=team,
-            defusekit=defusekit_bool,
-            is_scoped=is_scoped,
-            flashed=flashed,
-        )
+from app.gsi_state import GSIStateTracker, GameState
 
 
 class GSIServer:
@@ -164,10 +15,22 @@ class GSIServer:
         self._thread: threading.Thread | None = None
         self._httpd: ThreadingHTTPServer | None = None
         self._listeners: list[Callable[[GameState], None]] = []
+        self._connection_listeners: list[Callable[[], None]] = []
+        self._state_tracker = GSIStateTracker()
         self.latest_state: GameState | None = None
 
     def add_listener(self, callback: Callable[[GameState], None]) -> None:
         self._listeners.append(callback)
+
+    def add_connection_listener(self, callback: Callable[[], None]) -> None:
+        self._connection_listeners.append(callback)
+
+    def _mark_connected(self) -> None:
+        for callback in list(self._connection_listeners):
+            try:
+                callback()
+            except Exception:
+                pass
 
     def _dispatch(self, state: GameState) -> None:
         self.latest_state = state
@@ -185,11 +48,12 @@ class GSIServer:
 
         class Handler(BaseHTTPRequestHandler):
             def do_POST(self) -> None:  # noqa: N802
+                outer._mark_connected()
                 length = int(self.headers.get("Content-Length", "0"))
                 raw = self.rfile.read(length) if length > 0 else b"{}"
                 try:
                     payload = json.loads(raw.decode("utf-8"))
-                    state = GameState.from_payload(payload)
+                    state = outer._state_tracker.state_from_payload(payload)
                     outer._dispatch(state)
                     body = b'{"ok": true}'
                     self.send_response(200)

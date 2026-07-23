@@ -203,7 +203,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.shared_settings_tab.shared_game_stretched.stateChanged.connect(self._on_shared_settings_changed)
         self.shared_settings_tab.shared_display_width.valueChanged.connect(self._on_shared_settings_changed)
         self.shared_settings_tab.shared_display_height.valueChanged.connect(self._on_shared_settings_changed)
-        self.shared_settings_tab.gsi_enabled.stateChanged.connect(self._on_gsi_changed)
         self.shared_settings_tab.gsi_host.editingFinished.connect(self._on_gsi_changed)
         self.shared_settings_tab.gsi_port.valueChanged.connect(self._on_gsi_changed)
         self.shared_settings_tab.hotkey_cv_trigger.editingFinished.connect(self._on_hotkeys_changed)
@@ -347,6 +346,10 @@ class MainWindow(QtWidgets.QMainWindow):
             self.pixel_trigger_tab.set_runtime_status(message.replace("[INFO] ", "").replace("[WARNING] ", "").replace("[ERROR] ", ""))
         elif source == "cv_trigger":
             self.cv_trigger_tab.set_runtime_status(message.replace("[INFO] ", "").replace("[WARNING] ", "").replace("[ERROR] ", ""))
+        elif source == "gsi_connection":
+            self.shared_settings_tab.set_gsi_connection_status(message == "Connected")
+        elif source == "gsi_shutoff":
+            self.shared_settings_tab.set_gsi_system_active(message == "Active")
         elif source == "gsi" and "weapon=" in message:
             clean = message.replace("[INFO] ", "")
             self.shared_settings_tab.set_last_state(clean)
