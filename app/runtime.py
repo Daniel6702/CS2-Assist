@@ -7,7 +7,18 @@ from typing import Any, Callable
 from app.components.base import BaseComponent
 from app.components.bhop import BhopComponent
 from app.components.counter_strafe import CounterStrafeComponent
-from app.components import AutoAcceptComponent, AutoAirStrafeComponent, AutoShootComponent, BombTimerComponent, CVTriggerComponent, FlashFilterComponent, JumpThrowComponent, KillSoundComponent, LongJumpComponent
+from app.components import (
+    AutoAcceptComponent,
+    AutoAirStrafeComponent,
+    AutoShootComponent,
+    BombTimerComponent,
+    CVTriggerComponent,
+    FlashFilterComponent,
+    JumpThrowComponent,
+    KillSoundComponent,
+    LongJumpComponent,
+    RoundStartAlertComponent,
+)
 from app.components.sniper_crosshair import SniperCrosshairComponent
 from app.components.long_jump import CommandBridge
 from app.components.pixel_trigger import PixelTriggerComponent
@@ -44,6 +55,7 @@ class RuntimeManager:
             "auto_accept": AutoAcceptComponent(),
             "auto_shoot": AutoShootComponent(),
             "sniper_crosshair": SniperCrosshairComponent(),
+            "round_start_alert": RoundStartAlertComponent(),
             "flash_filter": FlashFilterComponent(),
         }
         for component in self.components.values():

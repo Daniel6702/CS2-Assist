@@ -6,12 +6,13 @@
     But the biggest problem is that, we only know the targets screen space position, not their true position. Which means if the screen / view moves, then this is equal to the actual targets moves. I.e. if the aim assist attempts to move to the target, but the target is extrapolated dependent on this movement itself, this causes inevitable closed loop instability. Causing jittering and oscillations. Fundamental limit of control theory, loop gain > 1, when extrapolating, -> oscilations. There is not world space / ground truth reference, not even mentioning the delay and unstable input.
     Only potential solution: subtracting camera movement, but probably not worth looking in to.
 
-- Debugging tab with log, aim target overlay, bounding box overlay
+- Debugging tab with log, aim target overlay, bounding box overlay and arrow pointing to target with length equal to strength
 
 - Defuse timer. I.e. when Ct start defusing T can tell for how long.
 
-- When the player is dead disable CV Aim assist
-
 - Check if aim stregnth and max speed are both necessary.
 
-- The launcher should not say Counter Strike Global Offensive. Just; Counter Strike 2
+- Bomb timer detects red timer
+
+- Regarding the auto counter strafing. Short presses does not result in a counter strafe in the oposite direction. A previous change was made, such that counter strafing did not always occur for small / short presses, but that was suppose to only be when the forward w key was also pressed.
+

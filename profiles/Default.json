@@ -530,6 +530,11 @@
             "enabled": true,
             "crosshair_code": "CSGO-rfwPG-LsaOQ-ERc8q-qiuds-sbK5O",
             "stay_when_scoped": false
+        },
+        "round_start_alert": {
+            "enabled": true,
+            "sound_file": "./resources/sounds/round_start.mp3",
+            "volume": 50
         }
     }
 }

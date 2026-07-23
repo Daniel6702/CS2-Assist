@@ -427,6 +427,10 @@ class MainWindow(QtWidgets.QMainWindow):
             self.misc_tab.load_config("auto_accept", deep_get(self.current_profile_data, "components.auto_accept", {}))
             self.misc_tab.load_config("auto_shoot", deep_get(self.current_profile_data, "components.auto_shoot", {}))
             self.misc_tab.load_config("sniper_crosshair", deep_get(self.current_profile_data, "components.sniper_crosshair", {}))
+            self.misc_tab.load_config(
+                "round_start_alert",
+                deep_get(self.current_profile_data, "components.round_start_alert", {}),
+            )
             self.misc_tab.load_config("flash_filter", deep_get(self.current_profile_data, "components.flash_filter", {}))
             self._movement_hotkey_disabled.clear()
             self._configure_hotkeys()

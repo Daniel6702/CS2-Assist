@@ -145,6 +145,11 @@ def default_profile() -> dict[str, Any]:
                 "crosshair_code": "",
                 "stay_when_scoped": False,
             },
+            "round_start_alert": {
+                "enabled": False,
+                "sound_file": "",
+                "volume": 50,
+            },
             "flash_filter": {
                 "enabled": False,
                 "output": "",

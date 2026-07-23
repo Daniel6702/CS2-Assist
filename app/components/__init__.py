@@ -7,4 +7,5 @@ from .flash_filter import FlashFilterComponent
 from .jump_throw import JumpThrowComponent
 from .kill_sound import KillSoundComponent
 from .long_jump import LongJumpComponent
+from .round_start_alert import RoundStartAlertComponent
 from .sniper_crosshair import SniperCrosshairComponent
